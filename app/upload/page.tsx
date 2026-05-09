@@ -12,25 +12,55 @@ export default function UploadPage() {
   const handleSubmit = async () => {
     if (!file) return setMessage("Choose a music file first.");
 
-    setMessage("Uploading...");
+    setMessage("Uploading to Cloudinary...");
     setFileUrl("");
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("title", title);
-    formData.append("artist", artist);
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
-    const res = await fetch("/api/upload", {
+    const cloudData = new FormData();
+    cloudData.append("file", file);
+    cloudData.append("upload_preset", uploadPreset || "");
+    cloudData.append("folder", "viberush");
+    cloudData.append("resource_type", "video");
+
+    const cloudRes = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`,
+      {
+        method: "POST",
+        body: cloudData,
+      }
+    );
+
+    const cloudinaryFile = await cloudRes.json();
+
+    if (!cloudRes.ok) {
+      console.error(cloudinaryFile);
+      return setMessage("Cloudinary upload failed.");
+    }
+
+    setMessage("Saving track...");
+
+    const saveRes = await fetch("/api/upload", {
       method: "POST",
-      body: formData,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: title || file.name.replace(/\.[^/.]+$/, ""),
+        artist: artist || "Unknown Artist",
+        url: cloudinaryFile.secure_url,
+        fileName: cloudinaryFile.public_id,
+        resourceType: cloudinaryFile.resource_type,
+      }),
     });
 
-    const data = await res.json();
-
-    if (!res.ok) return setMessage("Upload failed. Try again.");
+    if (!saveRes.ok) {
+      return setMessage("Uploaded to Cloudinary, but saving to library failed.");
+    }
 
     setMessage("Upload successful ✅");
-    setFileUrl(data.song.url);
+    setFileUrl(cloudinaryFile.secure_url);
     setTitle("");
     setArtist("");
     setFile(null);
