@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { createClient } from "@supabase/supabase-js";
 import { v2 as cloudinary } from "cloudinary";
 
 cloudinary.config({
@@ -9,43 +8,46 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const uploadDir = path.join(process.cwd(), "public", "uploads");
-const dbPath = path.join(process.cwd(), "public", "uploads", "songs.json");
-
-function readSongs() {
-  if (!fs.existsSync(dbPath)) return [];
-  return JSON.parse(fs.readFileSync(dbPath, "utf-8"));
-}
-
-function writeSongs(songs: any[]) {
-  if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-  }
-
-  fs.writeFileSync(dbPath, JSON.stringify(songs, null, 2));
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    const newSong = {
-      id: Date.now().toString(),
-      title: body.title || "Untitled",
-      artist: body.artist || "Unknown Artist",
-      url: body.url,
-      fileName: body.fileName,
-      resourceType: body.resourceType || "video",
-      createdAt: new Date().toISOString(),
-    };
+    const { data, error } = await supabase
+      .from("songs")
+      .insert({
+        title: body.title || "Untitled",
+        artist: body.artist || "Unknown Artist",
+        url: body.url,
+        file_name: body.fileName,
+        resource_type: body.resourceType || "video",
+      })
+      .select()
+      .single();
 
-    const songs = readSongs();
-    songs.unshift(newSong);
-    writeSongs(songs);
+    if (error) {
+      console.error("SUPABASE SAVE ERROR:", error);
+      return NextResponse.json(
+        { error: "Save failed", details: error.message },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       message: "Saved",
-      song: newSong,
+      song: {
+        id: data.id,
+        title: data.title,
+        artist: data.artist,
+        url: data.url,
+        fileName: data.file_name,
+        resourceType: data.resource_type,
+        createdAt: data.created_at,
+      },
     });
   } catch (error: any) {
     console.error("SAVE ERROR:", error);
@@ -62,13 +64,29 @@ export async function POST(req: Request) {
 
 export async function GET() {
   try {
-    return NextResponse.json({
-      songs: readSongs(),
-    });
+    const { data, error } = await supabase
+      .from("songs")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("SUPABASE GET ERROR:", error);
+      return NextResponse.json({ songs: [] });
+    }
+
+    const songs = data.map((song) => ({
+      id: song.id,
+      title: song.title,
+      artist: song.artist,
+      url: song.url,
+      fileName: song.file_name,
+      resourceType: song.resource_type,
+      createdAt: song.created_at,
+    }));
+
+    return NextResponse.json({ songs });
   } catch {
-    return NextResponse.json({
-      songs: [],
-    });
+    return NextResponse.json({ songs: [] });
   }
 }
 
@@ -76,17 +94,35 @@ export async function DELETE(req: Request) {
   try {
     const { id } = await req.json();
 
-    const songs = readSongs();
-    const song = songs.find((s: any) => s.id === id);
+    const { data: song, error: findError } = await supabase
+      .from("songs")
+      .select("*")
+      .eq("id", id)
+      .single();
 
-    if (song) {
-      await cloudinary.uploader.destroy(song.fileName, {
-        resource_type: song.resourceType || "video",
-      });
+    if (findError || !song) {
+      return NextResponse.json(
+        { error: "Song not found" },
+        { status: 404 }
+      );
     }
 
-    const updatedSongs = songs.filter((s: any) => s.id !== id);
-    writeSongs(updatedSongs);
+    await cloudinary.uploader.destroy(song.file_name, {
+      resource_type: song.resource_type || "video",
+    });
+
+    const { error: deleteError } = await supabase
+      .from("songs")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      console.error("SUPABASE DELETE ERROR:", deleteError);
+      return NextResponse.json(
+        { error: "Delete failed", details: deleteError.message },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       message: "Deleted",
