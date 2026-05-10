@@ -1,6 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -11,6 +17,16 @@ export default function UploadPage() {
   const [fileUrl, setFileUrl] = useState("");
   const [coverPreview, setCoverPreview] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUserEmail(data.user?.email || null);
+    };
+
+    checkUser();
+  }, []);
 
   const uploadToCloudinary = async (
     selectedFile: File,
@@ -36,7 +52,9 @@ export default function UploadPage() {
 
     if (!cloudRes.ok) {
       console.error(cloudinaryFile);
-      throw new Error(cloudinaryFile?.error?.message || "Cloudinary upload failed");
+      throw new Error(
+        cloudinaryFile?.error?.message || "Cloudinary upload failed"
+      );
     }
 
     return cloudinaryFile;
@@ -44,6 +62,14 @@ export default function UploadPage() {
 
   const handleSubmit = async () => {
     if (!file) return setMessage("Choose a music file first.");
+
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+
+    if (!token) {
+      setMessage("Please log in before uploading.");
+      return;
+    }
 
     try {
       setIsUploading(true);
@@ -60,12 +86,13 @@ export default function UploadPage() {
         coverUrl = cloudinaryCover.secure_url;
       }
 
-      setMessage("Saving track to library...");
+      setMessage("Saving track to your account...");
 
       const saveRes = await fetch("/api/upload", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           title: title || file.name.replace(/\.[^/.]+$/, ""),
@@ -81,7 +108,11 @@ export default function UploadPage() {
 
       if (!saveRes.ok) {
         console.error(saveData);
-        return setMessage(saveData?.details || "Uploaded to Cloudinary, but saving to library failed.");
+        return setMessage(
+          saveData?.details ||
+            saveData?.error ||
+            "Uploaded to Cloudinary, but saving to library failed."
+        );
       }
 
       setMessage("Upload successful ✅");
@@ -99,6 +130,12 @@ export default function UploadPage() {
     }
   };
 
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setUserEmail(null);
+    setMessage("Logged out.");
+  };
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-black via-zinc-950 to-orange-950 text-white">
       <nav className="flex items-center justify-between border-b border-zinc-900 bg-black/60 p-6 backdrop-blur-xl">
@@ -106,12 +143,30 @@ export default function UploadPage() {
           VibeRush
         </a>
 
-        <a
-          href="/library"
-          className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-bold transition hover:bg-zinc-900 active:scale-95"
-        >
-          Library
-        </a>
+        <div className="flex items-center gap-3">
+          {userEmail ? (
+            <button
+              onClick={logout}
+              className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-bold transition hover:bg-zinc-900 active:scale-95"
+            >
+              Logout
+            </button>
+          ) : (
+            <a
+              href="/auth"
+              className="rounded-full bg-orange-500 px-5 py-2 text-sm font-black text-black transition hover:bg-orange-400 active:scale-95"
+            >
+              Login
+            </a>
+          )}
+
+          <a
+            href="/library"
+            className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-bold transition hover:bg-zinc-900 active:scale-95"
+          >
+            Library
+          </a>
+        </div>
       </nav>
 
       <section className="mx-auto flex min-h-[80vh] max-w-2xl flex-col items-center justify-center px-6 py-10">
@@ -123,8 +178,21 @@ export default function UploadPage() {
           <h1 className="text-4xl font-black">Drop your next sound</h1>
 
           <p className="mt-3 text-zinc-400">
-            Upload your audio, add cover art, and publish it to your library.
+            Upload your audio, add cover art, and publish it to your account.
           </p>
+
+          {userEmail ? (
+            <p className="mt-5 rounded-xl border border-green-900 bg-green-950/40 p-3 text-sm text-green-300">
+              Logged in as {userEmail}
+            </p>
+          ) : (
+            <div className="mt-5 rounded-xl border border-orange-900 bg-orange-950/40 p-4 text-sm text-orange-200">
+              You must be logged in to upload.
+              <a href="/auth" className="ml-2 font-black underline">
+                Login or sign up
+              </a>
+            </div>
+          )}
 
           <input
             value={title}
@@ -157,9 +225,7 @@ export default function UploadPage() {
                 Choose audio
               </span>
 
-              <p className="mt-2 text-sm text-zinc-500">
-                MP3, WAV, M4A
-              </p>
+              <p className="mt-2 text-sm text-zinc-500">MP3, WAV, M4A</p>
             </label>
 
             <label className="block cursor-pointer rounded-2xl border border-dashed border-zinc-700 bg-black/60 p-7 text-center transition hover:bg-zinc-900 active:scale-95">
@@ -184,9 +250,7 @@ export default function UploadPage() {
                 Add cover art
               </span>
 
-              <p className="mt-2 text-sm text-zinc-500">
-                Optional JPG, PNG
-              </p>
+              <p className="mt-2 text-sm text-zinc-500">Optional JPG, PNG</p>
             </label>
           </div>
 
@@ -210,7 +274,7 @@ export default function UploadPage() {
 
           <button
             onClick={handleSubmit}
-            disabled={isUploading}
+            disabled={isUploading || !userEmail}
             className="mt-6 w-full rounded-full bg-orange-500 px-6 py-4 font-black text-black transition hover:bg-orange-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isUploading ? "Uploading..." : "Upload Track"}

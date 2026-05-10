@@ -19,8 +19,31 @@ function getSupabase() {
   return createClient(supabaseUrl, serviceKey);
 }
 
+async function getUserFromRequest(req: Request) {
+  const authHeader = req.headers.get("authorization");
+  const token = authHeader?.replace("Bearer ", "");
+
+  if (!token) return null;
+
+  const supabase = getSupabase();
+  const { data, error } = await supabase.auth.getUser(token);
+
+  if (error || !data.user) return null;
+
+  return data.user;
+}
+
 export async function POST(req: Request) {
   try {
+    const user = await getUserFromRequest(req);
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "You must be logged in to upload." },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
 
     if (!body.url || !body.fileName) {
@@ -35,6 +58,7 @@ export async function POST(req: Request) {
     const { data, error } = await supabase
       .from("songs")
       .insert({
+        user_id: user.id,
         title: body.title || "Untitled",
         artist: body.artist || "Unknown Artist",
         url: body.url,
@@ -56,6 +80,7 @@ export async function POST(req: Request) {
       message: "Saved",
       song: {
         id: data.id,
+        userId: data.user_id,
         title: data.title,
         artist: data.artist,
         url: data.url,
@@ -91,6 +116,7 @@ export async function GET() {
 
     const songs = data.map((song) => ({
       id: song.id,
+      userId: song.user_id,
       title: song.title,
       artist: song.artist,
       url: song.url,
@@ -111,6 +137,15 @@ export async function GET() {
 
 export async function DELETE(req: Request) {
   try {
+    const user = await getUserFromRequest(req);
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "You must be logged in to delete." },
+        { status: 401 }
+      );
+    }
+
     const { id } = await req.json();
     const supabase = getSupabase();
 
@@ -121,9 +156,13 @@ export async function DELETE(req: Request) {
       .single();
 
     if (findError || !song) {
+      return NextResponse.json({ error: "Song not found" }, { status: 404 });
+    }
+
+    if (song.user_id !== user.id) {
       return NextResponse.json(
-        { error: "Song not found" },
-        { status: 404 }
+        { error: "You can only delete your own songs." },
+        { status: 403 }
       );
     }
 
