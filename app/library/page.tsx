@@ -23,9 +23,11 @@ export default function LibraryPage() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<"public" | "mine">("public");
+  const [view, setView] = useState<"public" | "mine" | "favorites">("public");
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [likingId, setLikingId] = useState<string | null>(null);
+  const [likedSongIds, setLikedSongIds] = useState<string[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
@@ -33,6 +35,33 @@ export default function LibraryPage() {
     const { data } = await supabase.auth.getUser();
     setUserId(data.user?.id || null);
     setUserEmail(data.user?.email || null);
+  };
+
+  const getToken = async () => {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token || null;
+  };
+
+  const fetchLikes = async () => {
+    const token = await getToken();
+
+    if (!token) {
+      setLikedSongIds([]);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/likes", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+      setLikedSongIds(data.likedSongIds || []);
+    } catch {
+      setLikedSongIds([]);
+    }
   };
 
   const fetchSongs = async () => {
@@ -47,12 +76,48 @@ export default function LibraryPage() {
     }
   };
 
+  const toggleLike = async (songId: string) => {
+    const token = await getToken();
+
+    if (!token) {
+      alert("Please log in to like songs.");
+      return;
+    }
+
+    setLikingId(songId);
+
+    try {
+      const res = await fetch("/api/likes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ songId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data?.error || "Like failed.");
+        return;
+      }
+
+      setLikedSongIds((current) =>
+        data.liked
+          ? Array.from(new Set([...current, songId]))
+          : current.filter((id) => id !== songId)
+      );
+    } finally {
+      setLikingId(null);
+    }
+  };
+
   const deleteSong = async (id: string) => {
     const confirmDelete = confirm("Delete this track permanently?");
     if (!confirmDelete) return;
 
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
+    const token = await getToken();
 
     if (!token) {
       alert("Please log in before deleting.");
@@ -79,6 +144,7 @@ export default function LibraryPage() {
       }
 
       if (currentSong?.id === id) setCurrentSong(null);
+      setLikedSongIds((current) => current.filter((songId) => songId !== id));
       await fetchSongs();
     } finally {
       setDeletingId(null);
@@ -86,14 +152,21 @@ export default function LibraryPage() {
   };
 
   const visibleSongs = useMemo(() => {
-    const baseSongs =
-      view === "mine" ? songs.filter((song) => song.userId === userId) : songs;
+    let baseSongs = songs;
+
+    if (view === "mine") {
+      baseSongs = songs.filter((song) => song.userId === userId);
+    }
+
+    if (view === "favorites") {
+      baseSongs = songs.filter((song) => likedSongIds.includes(song.id));
+    }
 
     return baseSongs.filter((song) => {
       const text = `${song.title} ${song.artist}`.toLowerCase();
       return text.includes(search.toLowerCase());
     });
-  }, [songs, search, view, userId]);
+  }, [songs, search, view, userId, likedSongIds]);
 
   const myUploadCount = useMemo(() => {
     return songs.filter((song) => song.userId === userId).length;
@@ -102,6 +175,7 @@ export default function LibraryPage() {
   useEffect(() => {
     fetchUser();
     fetchSongs();
+    fetchLikes();
   }, []);
 
   return (
@@ -143,18 +217,24 @@ export default function LibraryPage() {
           <div className="mt-3 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div>
               <h1 className="text-5xl font-black">
-                {view === "mine" ? "My Uploads 🎙️" : "Public Library 🎧"}
+                {view === "mine"
+                  ? "My Uploads 🎙️"
+                  : view === "favorites"
+                    ? "Favorites ❤️"
+                    : "Public Library 🎧"}
               </h1>
 
               <p className="mt-3 max-w-xl text-zinc-400">
                 {view === "mine"
                   ? "Manage tracks uploaded under your account."
-                  : "Stream, search, and discover music uploaded to VibeRush."}
+                  : view === "favorites"
+                    ? "Your liked tracks in one place."
+                    : "Stream, search, and discover music uploaded to VibeRush."}
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-zinc-800 bg-black/70 px-5 py-4 text-right">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-2xl border border-zinc-800 bg-black/70 px-4 py-4 text-right">
                 <p className="text-3xl font-black text-orange-400">
                   {songs.length}
                 </p>
@@ -163,12 +243,21 @@ export default function LibraryPage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-zinc-800 bg-black/70 px-5 py-4 text-right">
+              <div className="rounded-2xl border border-zinc-800 bg-black/70 px-4 py-4 text-right">
                 <p className="text-3xl font-black text-orange-400">
                   {userId ? myUploadCount : 0}
                 </p>
                 <p className="text-xs uppercase tracking-widest text-zinc-500">
                   Mine
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-zinc-800 bg-black/70 px-4 py-4 text-right">
+                <p className="text-3xl font-black text-orange-400">
+                  {likedSongIds.length}
+                </p>
+                <p className="text-xs uppercase tracking-widest text-zinc-500">
+                  Likes
                 </p>
               </div>
             </div>
@@ -185,7 +274,7 @@ export default function LibraryPage() {
             <div className="flex shrink-0 rounded-2xl border border-zinc-800 bg-black p-1">
               <button
                 onClick={() => setView("public")}
-                className={`rounded-xl px-5 py-3 text-sm font-black transition ${
+                className={`rounded-xl px-4 py-3 text-sm font-black transition ${
                   view === "public"
                     ? "bg-orange-500 text-black"
                     : "text-zinc-400 hover:text-white"
@@ -197,7 +286,7 @@ export default function LibraryPage() {
               <button
                 onClick={() => setView("mine")}
                 disabled={!userId}
-                className={`rounded-xl px-5 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                className={`rounded-xl px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-40 ${
                   view === "mine"
                     ? "bg-orange-500 text-black"
                     : "text-zinc-400 hover:text-white"
@@ -205,12 +294,24 @@ export default function LibraryPage() {
               >
                 My Uploads
               </button>
+
+              <button
+                onClick={() => setView("favorites")}
+                disabled={!userId}
+                className={`rounded-xl px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                  view === "favorites"
+                    ? "bg-orange-500 text-black"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                Favorites
+              </button>
             </div>
           </div>
 
           {!userId && (
             <p className="mt-4 rounded-xl border border-orange-900 bg-orange-950/30 p-3 text-sm text-orange-200">
-              Log in to view your own uploads and delete tracks you uploaded.
+              Log in to view your uploads, favorite tracks, and delete tracks you uploaded.
             </p>
           )}
         </div>
@@ -237,15 +338,18 @@ export default function LibraryPage() {
           <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-10 text-center">
             <h2 className="text-2xl font-black">No matches found</h2>
             <p className="mt-2 text-zinc-400">
-              {view === "mine"
-                ? "You have not uploaded any matching tracks yet."
-                : "Try searching another song title or artist."}
+              {view === "favorites"
+                ? "You have not liked any matching tracks yet."
+                : view === "mine"
+                  ? "You have not uploaded any matching tracks yet."
+                  : "Try searching another song title or artist."}
             </p>
           </div>
         ) : (
           <div className="grid gap-5 md:grid-cols-2">
             {visibleSongs.map((song, index) => {
               const isOwner = userId && song.userId === userId;
+              const isLiked = likedSongIds.includes(song.id);
 
               return (
                 <div
@@ -282,11 +386,19 @@ export default function LibraryPage() {
                           Track {index + 1}
                         </p>
 
-                        {isOwner && (
-                          <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-black text-black">
-                            Yours
-                          </span>
-                        )}
+                        <div className="flex gap-2">
+                          {isOwner && (
+                            <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-black text-black">
+                              Yours
+                            </span>
+                          )}
+
+                          {isLiked && (
+                            <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-black text-white">
+                              Liked
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <h2 className="truncate text-2xl font-black text-white">
@@ -316,6 +428,18 @@ export default function LibraryPage() {
                         className="flex-1 rounded-full bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:bg-orange-400 active:scale-95"
                       >
                         Play
+                      </button>
+
+                      <button
+                        onClick={() => toggleLike(song.id)}
+                        disabled={likingId === song.id}
+                        className={`rounded-full px-5 py-3 text-sm font-black transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
+                          isLiked
+                            ? "bg-red-600 text-white hover:bg-red-500"
+                            : "bg-zinc-800 text-white hover:bg-zinc-700"
+                        }`}
+                      >
+                        {isLiked ? "❤️" : "♡"}
                       </button>
 
                       {isOwner && (
