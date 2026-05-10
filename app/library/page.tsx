@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Song = {
   id: string;
@@ -8,117 +8,187 @@ type Song = {
   artist: string;
   url: string;
   fileName: string;
+  createdAt?: string;
 };
 
 export default function LibraryPage() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchSongs = async () => {
-    const res = await fetch("/api/upload");
-    const data = await res.json();
-    setSongs(data.songs || []);
+    try {
+      const res = await fetch("/api/upload");
+      const data = await res.json();
+      setSongs(data.songs || []);
+    } catch {
+      setSongs([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const deleteSong = async (id: string) => {
-    await fetch("/api/upload", {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ id }),
-    });
+    const confirmDelete = confirm("Delete this track permanently?");
+    if (!confirmDelete) return;
 
-    if (currentSong?.id === id) setCurrentSong(null);
-    fetchSongs();
+    setDeletingId(id);
+
+    try {
+      await fetch("/api/upload", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id }),
+      });
+
+      if (currentSong?.id === id) setCurrentSong(null);
+      await fetchSongs();
+    } finally {
+      setDeletingId(null);
+    }
   };
+
+  const filteredSongs = useMemo(() => {
+    return songs.filter((song) => {
+      const text = `${song.title} ${song.artist}`.toLowerCase();
+      return text.includes(search.toLowerCase());
+    });
+  }, [songs, search]);
 
   useEffect(() => {
     fetchSongs();
   }, []);
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-black via-zinc-950 to-orange-950 pb-32 text-white">
-      <nav className="flex items-center justify-between p-6">
-        <a href="/" className="text-2xl font-bold text-orange-500">
+    <main className="min-h-screen bg-gradient-to-br from-black via-zinc-950 to-orange-950 pb-36 text-white">
+      <nav className="sticky top-0 z-20 flex items-center justify-between border-b border-zinc-900 bg-black/70 p-6 backdrop-blur-xl">
+        <a href="/" className="text-2xl font-black text-orange-500">
           VibeRush
         </a>
 
-        <a
-          href="/upload"
-          className="rounded-full bg-orange-500 px-5 py-2 text-sm font-bold text-black transition hover:bg-orange-400 active:scale-95"
-        >
-          Upload
-        </a>
+        <div className="flex items-center gap-3">
+          <a
+            href="/upload"
+            className="rounded-full bg-orange-500 px-5 py-2 text-sm font-black text-black transition hover:bg-orange-400 active:scale-95"
+          >
+            Upload
+          </a>
+        </div>
       </nav>
 
-      <section className="mx-auto max-w-5xl px-6 py-10">
-        <div className="mb-10">
+      <section className="mx-auto max-w-6xl px-6 py-10">
+        <div className="mb-8 rounded-3xl border border-zinc-800 bg-zinc-950/70 p-8 shadow-2xl">
           <p className="text-sm font-bold uppercase tracking-widest text-orange-400">
             Music Vault
           </p>
 
-          <h1 className="mt-2 text-5xl font-black">Your Library 🎧</h1>
+          <div className="mt-3 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h1 className="text-5xl font-black">Your Library 🎧</h1>
 
-          <p className="mt-3 max-w-xl text-zinc-400">
-            Manage your tracks, play your catalog, and control your sound.
-          </p>
+              <p className="mt-3 max-w-xl text-zinc-400">
+                Stream, search, manage, and control your uploaded catalog.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-800 bg-black/70 px-5 py-4 text-right">
+              <p className="text-3xl font-black text-orange-400">
+                {songs.length}
+              </p>
+              <p className="text-xs uppercase tracking-widest text-zinc-500">
+                Total Tracks
+              </p>
+            </div>
+          </div>
+
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by title or artist..."
+            className="mt-8 w-full rounded-2xl border border-zinc-800 bg-black p-4 text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-500"
+          />
         </div>
 
-        {songs.length === 0 ? (
+        {loading ? (
           <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-10 text-center">
-            <h2 className="text-2xl font-bold">No songs yet</h2>
+            <p className="font-bold text-orange-300">Loading library...</p>
+          </div>
+        ) : songs.length === 0 ? (
+          <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-10 text-center shadow-2xl">
+            <h2 className="text-2xl font-black">No songs yet</h2>
 
             <p className="mt-2 text-zinc-400">
-              Upload your first track and it will appear here.
+              Upload your first track and start building your catalog.
             </p>
 
             <a href="/upload">
-              <button className="mt-6 rounded-full bg-orange-500 px-6 py-3 font-bold text-black transition hover:bg-orange-400 active:scale-95">
+              <button className="mt-6 rounded-full bg-orange-500 px-6 py-3 font-black text-black transition hover:bg-orange-400 active:scale-95">
                 Upload Music
               </button>
             </a>
           </div>
+        ) : filteredSongs.length === 0 ? (
+          <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-10 text-center">
+            <h2 className="text-2xl font-black">No matches found</h2>
+            <p className="mt-2 text-zinc-400">
+              Try searching another song title or artist.
+            </p>
+          </div>
         ) : (
           <div className="grid gap-5">
-            {songs.map((song, index) => (
+            {filteredSongs.map((song, index) => (
               <div
                 key={song.id}
-                className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-5 shadow-2xl transition hover:-translate-y-1 hover:shadow-orange-900/20"
+                className={`rounded-3xl border p-5 shadow-2xl transition hover:-translate-y-1 ${
+                  currentSong?.id === song.id
+                    ? "border-orange-500 bg-orange-950/30 shadow-orange-900/30"
+                    : "border-zinc-800 bg-zinc-950/80 hover:shadow-orange-900/20"
+                }`}
               >
-                <div className="mb-4 flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm text-zinc-500">
+                <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-zinc-500">
                       Track {index + 1}
                     </p>
 
-                    <h2 className="break-all text-xl font-bold text-orange-300">
+                    <h2 className="truncate text-2xl font-black text-orange-300">
                       {song.title}
                     </h2>
 
-                    <p className="text-sm text-zinc-400">
+                    <p className="truncate text-sm text-zinc-400">
                       {song.artist}
                     </p>
+
+                    {song.createdAt && (
+                      <p className="mt-2 text-xs text-zinc-600">
+                        Added {new Date(song.createdAt).toLocaleDateString()}
+                      </p>
+                    )}
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex shrink-0 gap-2">
                     <button
                       onClick={() => setCurrentSong(song)}
-                      className="rounded-full bg-orange-500 px-4 py-2 text-sm font-bold text-black transition hover:bg-orange-400 active:scale-95"
+                      className="rounded-full bg-orange-500 px-5 py-2 text-sm font-black text-black transition hover:bg-orange-400 active:scale-95"
                     >
                       Play
                     </button>
 
                     <button
                       onClick={() => deleteSong(song.id)}
-                      className="rounded-full bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-500 active:scale-95"
+                      disabled={deletingId === song.id}
+                      className="rounded-full bg-red-600 px-5 py-2 text-sm font-black text-white transition hover:bg-red-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Delete
+                      {deletingId === song.id ? "Deleting..." : "Delete"}
                     </button>
                   </div>
                 </div>
 
-                <audio controls className="w-full">
+                <audio controls className="mt-5 w-full">
                   <source src={song.url} />
                 </audio>
               </div>
@@ -128,14 +198,18 @@ export default function LibraryPage() {
       </section>
 
       {currentSong && (
-        <div className="fixed bottom-0 left-0 right-0 border-t border-zinc-800 bg-black/95 p-4 backdrop-blur">
-          <div className="mx-auto flex max-w-5xl flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm text-zinc-500">Now Playing</p>
-              <h3 className="font-bold text-orange-300">
+        <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-black/95 p-4 shadow-2xl backdrop-blur-xl">
+          <div className="mx-auto flex max-w-6xl flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">
+                Now Playing
+              </p>
+
+              <h3 className="truncate font-black text-orange-300">
                 {currentSong.title}
               </h3>
-              <p className="text-sm text-zinc-400">
+
+              <p className="truncate text-sm text-zinc-400">
                 {currentSong.artist}
               </p>
             </div>
