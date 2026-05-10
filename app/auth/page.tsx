@@ -1,10 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function AuthPage() {
-  const supabase = createClientComponentClient();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -37,7 +41,10 @@ export default function AuthPage() {
           VibeRush
         </a>
 
-        <a href="/library" className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-bold">
+        <a
+          href="/library"
+          className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-bold"
+        >
           Library
         </a>
       </nav>
