@@ -8,6 +8,7 @@ type Song = {
   artist: string;
   url: string;
   fileName: string;
+  coverUrl?: string | null;
   createdAt?: string;
 };
 
@@ -70,14 +71,12 @@ export default function LibraryPage() {
           VibeRush
         </a>
 
-        <div className="flex items-center gap-3">
-          <a
-            href="/upload"
-            className="rounded-full bg-orange-500 px-5 py-2 text-sm font-black text-black transition hover:bg-orange-400 active:scale-95"
-          >
-            Upload
-          </a>
-        </div>
+        <a
+          href="/upload"
+          className="rounded-full bg-orange-500 px-5 py-2 text-sm font-black text-black transition hover:bg-orange-400 active:scale-95"
+        >
+          Upload
+        </a>
       </nav>
 
       <section className="mx-auto max-w-6xl px-6 py-10">
@@ -139,41 +138,66 @@ export default function LibraryPage() {
             </p>
           </div>
         ) : (
-          <div className="grid gap-5">
+          <div className="grid gap-5 md:grid-cols-2">
             {filteredSongs.map((song, index) => (
               <div
                 key={song.id}
-                className={`rounded-3xl border p-5 shadow-2xl transition hover:-translate-y-1 ${
+                className={`overflow-hidden rounded-3xl border shadow-2xl transition hover:-translate-y-1 ${
                   currentSong?.id === song.id
                     ? "border-orange-500 bg-orange-950/30 shadow-orange-900/30"
                     : "border-zinc-800 bg-zinc-950/80 hover:shadow-orange-900/20"
                 }`}
               >
-                <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-zinc-500">
+                <div className="relative h-56 bg-zinc-900">
+                  {song.coverUrl ? (
+                    <img
+                      src={song.coverUrl}
+                      alt={`${song.title} cover`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-orange-950 via-black to-zinc-900">
+                      <div className="text-center">
+                        <p className="text-5xl">🎧</p>
+                        <p className="mt-3 text-sm font-bold uppercase tracking-widest text-orange-400">
+                          VibeRush
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+
+                  <div className="absolute bottom-4 left-4 right-4">
+                    <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">
                       Track {index + 1}
                     </p>
 
-                    <h2 className="truncate text-2xl font-black text-orange-300">
+                    <h2 className="truncate text-2xl font-black text-white">
                       {song.title}
                     </h2>
 
-                    <p className="truncate text-sm text-zinc-400">
+                    <p className="truncate text-sm text-orange-300">
                       {song.artist}
                     </p>
-
-                    {song.createdAt && (
-                      <p className="mt-2 text-xs text-zinc-600">
-                        Added {new Date(song.createdAt).toLocaleDateString()}
-                      </p>
-                    )}
                   </div>
+                </div>
 
-                  <div className="flex shrink-0 gap-2">
+                <div className="p-5">
+                  {song.createdAt && (
+                    <p className="mb-4 text-xs text-zinc-600">
+                      Added {new Date(song.createdAt).toLocaleDateString()}
+                    </p>
+                  )}
+
+                  <audio controls className="w-full">
+                    <source src={song.url} />
+                  </audio>
+
+                  <div className="mt-5 flex gap-2">
                     <button
                       onClick={() => setCurrentSong(song)}
-                      className="rounded-full bg-orange-500 px-5 py-2 text-sm font-black text-black transition hover:bg-orange-400 active:scale-95"
+                      className="flex-1 rounded-full bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:bg-orange-400 active:scale-95"
                     >
                       Play
                     </button>
@@ -181,16 +205,12 @@ export default function LibraryPage() {
                     <button
                       onClick={() => deleteSong(song.id)}
                       disabled={deletingId === song.id}
-                      className="rounded-full bg-red-600 px-5 py-2 text-sm font-black text-white transition hover:bg-red-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="rounded-full bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {deletingId === song.id ? "Deleting..." : "Delete"}
+                      {deletingId === song.id ? "..." : "Delete"}
                     </button>
                   </div>
                 </div>
-
-                <audio controls className="mt-5 w-full">
-                  <source src={song.url} />
-                </audio>
               </div>
             ))}
           </div>
@@ -200,18 +220,34 @@ export default function LibraryPage() {
       {currentSong && (
         <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-black/95 p-4 shadow-2xl backdrop-blur-xl">
           <div className="mx-auto flex max-w-6xl flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">
-                Now Playing
-              </p>
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-zinc-900">
+                {currentSong.coverUrl ? (
+                  <img
+                    src={currentSong.coverUrl}
+                    alt={`${currentSong.title} cover`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xl">
+                    🎧
+                  </div>
+                )}
+              </div>
 
-              <h3 className="truncate font-black text-orange-300">
-                {currentSong.title}
-              </h3>
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">
+                  Now Playing
+                </p>
 
-              <p className="truncate text-sm text-zinc-400">
-                {currentSong.artist}
-              </p>
+                <h3 className="truncate font-black text-orange-300">
+                  {currentSong.title}
+                </h3>
+
+                <p className="truncate text-sm text-zinc-400">
+                  {currentSong.artist}
+                </p>
+              </div>
             </div>
 
             <audio controls autoPlay className="w-full md:w-2/3">

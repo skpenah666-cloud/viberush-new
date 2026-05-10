@@ -4,28 +4,28 @@ import { useState } from "react";
 
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
   const [message, setMessage] = useState("");
   const [fileUrl, setFileUrl] = useState("");
+  const [coverPreview, setCoverPreview] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
 
-  const handleSubmit = async () => {
-    if (!file) return setMessage("Choose a music file first.");
-
-    setMessage("Uploading to Cloudinary...");
-    setFileUrl("");
-
+  const uploadToCloudinary = async (
+    selectedFile: File,
+    resourceType: "video" | "image"
+  ) => {
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
     const cloudData = new FormData();
-    cloudData.append("file", file);
+    cloudData.append("file", selectedFile);
     cloudData.append("upload_preset", uploadPreset || "");
     cloudData.append("folder", "viberush");
-    cloudData.append("resource_type", "video");
 
     const cloudRes = await fetch(
-      `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`,
+      `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
       {
         method: "POST",
         body: cloudData,
@@ -36,40 +36,73 @@ export default function UploadPage() {
 
     if (!cloudRes.ok) {
       console.error(cloudinaryFile);
-      return setMessage("Cloudinary upload failed.");
+      throw new Error(cloudinaryFile?.error?.message || "Cloudinary upload failed");
     }
 
-    setMessage("Saving track...");
+    return cloudinaryFile;
+  };
 
-    const saveRes = await fetch("/api/upload", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        title: title || file.name.replace(/\.[^/.]+$/, ""),
-        artist: artist || "Unknown Artist",
-        url: cloudinaryFile.secure_url,
-        fileName: cloudinaryFile.public_id,
-        resourceType: cloudinaryFile.resource_type,
-      }),
-    });
+  const handleSubmit = async () => {
+    if (!file) return setMessage("Choose a music file first.");
 
-    if (!saveRes.ok) {
-      return setMessage("Uploaded to Cloudinary, but saving to library failed.");
+    try {
+      setIsUploading(true);
+      setMessage("Uploading audio to Cloudinary...");
+      setFileUrl("");
+
+      const cloudinaryAudio = await uploadToCloudinary(file, "video");
+
+      let coverUrl = "";
+
+      if (coverFile) {
+        setMessage("Uploading cover art...");
+        const cloudinaryCover = await uploadToCloudinary(coverFile, "image");
+        coverUrl = cloudinaryCover.secure_url;
+      }
+
+      setMessage("Saving track to library...");
+
+      const saveRes = await fetch("/api/upload", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: title || file.name.replace(/\.[^/.]+$/, ""),
+          artist: artist || "Unknown Artist",
+          url: cloudinaryAudio.secure_url,
+          fileName: cloudinaryAudio.public_id,
+          resourceType: cloudinaryAudio.resource_type,
+          coverUrl,
+        }),
+      });
+
+      const saveData = await saveRes.json();
+
+      if (!saveRes.ok) {
+        console.error(saveData);
+        return setMessage(saveData?.details || "Uploaded to Cloudinary, but saving to library failed.");
+      }
+
+      setMessage("Upload successful ✅");
+      setFileUrl(cloudinaryAudio.secure_url);
+      setTitle("");
+      setArtist("");
+      setFile(null);
+      setCoverFile(null);
+      setCoverPreview("");
+    } catch (error: any) {
+      console.error(error);
+      setMessage(error?.message || "Upload failed. Try again.");
+    } finally {
+      setIsUploading(false);
     }
-
-    setMessage("Upload successful ✅");
-    setFileUrl(cloudinaryFile.secure_url);
-    setTitle("");
-    setArtist("");
-    setFile(null);
   };
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-black via-zinc-950 to-orange-950 text-white">
-      <nav className="flex items-center justify-between p-6">
-        <a href="/" className="text-2xl font-bold text-orange-500">
+      <nav className="flex items-center justify-between border-b border-zinc-900 bg-black/60 p-6 backdrop-blur-xl">
+        <a href="/" className="text-2xl font-black text-orange-500">
           VibeRush
         </a>
 
@@ -81,7 +114,7 @@ export default function UploadPage() {
         </a>
       </nav>
 
-      <section className="mx-auto flex min-h-[80vh] max-w-xl flex-col items-center justify-center px-6">
+      <section className="mx-auto flex min-h-[80vh] max-w-2xl flex-col items-center justify-center px-6 py-10">
         <div className="w-full rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 shadow-2xl">
           <p className="mb-3 text-sm font-bold uppercase tracking-widest text-orange-400">
             Creator Upload
@@ -90,7 +123,7 @@ export default function UploadPage() {
           <h1 className="text-4xl font-black">Drop your next sound</h1>
 
           <p className="mt-3 text-zinc-400">
-            Add your track details, upload your audio, and preview instantly.
+            Upload your audio, add cover art, and publish it to your library.
           </p>
 
           <input
@@ -107,38 +140,80 @@ export default function UploadPage() {
             className="mt-4 w-full rounded-xl border border-zinc-800 bg-black p-4 text-white outline-none focus:border-orange-500"
           />
 
-          <label className="mt-6 block cursor-pointer rounded-2xl border border-dashed border-orange-500/50 bg-black/60 p-8 text-center transition hover:bg-orange-500/10 active:scale-95">
-            <input
-              type="file"
-              accept="audio/*"
-              className="hidden"
-              onChange={(e) => {
-                setFile(e.target.files?.[0] || null);
-                setMessage("");
-                setFileUrl("");
-              }}
-            />
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <label className="block cursor-pointer rounded-2xl border border-dashed border-orange-500/50 bg-black/60 p-7 text-center transition hover:bg-orange-500/10 active:scale-95">
+              <input
+                type="file"
+                accept="audio/*"
+                className="hidden"
+                onChange={(e) => {
+                  setFile(e.target.files?.[0] || null);
+                  setMessage("");
+                  setFileUrl("");
+                }}
+              />
 
-            <span className="text-lg font-bold text-orange-400">
-              Choose audio file
-            </span>
+              <span className="text-lg font-bold text-orange-400">
+                Choose audio
+              </span>
 
-            <p className="mt-2 text-sm text-zinc-500">
-              MP3, WAV, M4A supported
-            </p>
-          </label>
+              <p className="mt-2 text-sm text-zinc-500">
+                MP3, WAV, M4A
+              </p>
+            </label>
 
-          {file && (
-            <p className="mt-5 rounded-xl bg-zinc-900 p-4 text-sm text-orange-300">
-              Selected: {file.name}
-            </p>
+            <label className="block cursor-pointer rounded-2xl border border-dashed border-zinc-700 bg-black/60 p-7 text-center transition hover:bg-zinc-900 active:scale-95">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const selectedCover = e.target.files?.[0] || null;
+                  setCoverFile(selectedCover);
+                  setMessage("");
+
+                  if (selectedCover) {
+                    setCoverPreview(URL.createObjectURL(selectedCover));
+                  } else {
+                    setCoverPreview("");
+                  }
+                }}
+              />
+
+              <span className="text-lg font-bold text-zinc-200">
+                Add cover art
+              </span>
+
+              <p className="mt-2 text-sm text-zinc-500">
+                Optional JPG, PNG
+              </p>
+            </label>
+          </div>
+
+          {(file || coverPreview) && (
+            <div className="mt-5 grid gap-4 md:grid-cols-[1fr_140px]">
+              {file && (
+                <p className="rounded-xl bg-zinc-900 p-4 text-sm text-orange-300">
+                  Audio selected: {file.name}
+                </p>
+              )}
+
+              {coverPreview && (
+                <img
+                  src={coverPreview}
+                  alt="Cover preview"
+                  className="h-36 w-36 rounded-2xl border border-zinc-800 object-cover"
+                />
+              )}
+            </div>
           )}
 
           <button
             onClick={handleSubmit}
-            className="mt-6 w-full rounded-full bg-orange-500 px-6 py-4 font-black text-black transition hover:bg-orange-400 active:scale-95"
+            disabled={isUploading}
+            className="mt-6 w-full rounded-full bg-orange-500 px-6 py-4 font-black text-black transition hover:bg-orange-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Upload Track
+            {isUploading ? "Uploading..." : "Upload Track"}
           </button>
 
           {message && (

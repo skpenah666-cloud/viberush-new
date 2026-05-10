@@ -40,6 +40,7 @@ export async function POST(req: Request) {
         url: body.url,
         file_name: body.fileName,
         resource_type: body.resourceType || "video",
+        cover_url: body.coverUrl || null,
       })
       .select()
       .single();
@@ -60,6 +61,7 @@ export async function POST(req: Request) {
         url: data.url,
         fileName: data.file_name,
         resourceType: data.resource_type,
+        coverUrl: data.cover_url,
         createdAt: data.created_at,
       },
     });
@@ -94,6 +96,7 @@ export async function GET() {
       url: song.url,
       fileName: song.file_name,
       resourceType: song.resource_type,
+      coverUrl: song.cover_url,
       createdAt: song.created_at,
     }));
 
