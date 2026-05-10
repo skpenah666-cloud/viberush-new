@@ -8,14 +8,29 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+function getSupabase() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error("Missing Supabase environment variables");
+  }
+
+  return createClient(supabaseUrl, serviceKey);
+}
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+
+    if (!body.url || !body.fileName) {
+      return NextResponse.json(
+        { error: "Missing Cloudinary URL or fileName" },
+        { status: 400 }
+      );
+    }
+
+    const supabase = getSupabase();
 
     const { data, error } = await supabase
       .from("songs")
@@ -30,9 +45,8 @@ export async function POST(req: Request) {
       .single();
 
     if (error) {
-      console.error("SUPABASE SAVE ERROR:", error);
       return NextResponse.json(
-        { error: "Save failed", details: error.message },
+        { error: "Supabase save failed", details: error.message },
         { status: 500 }
       );
     }
@@ -50,8 +64,6 @@ export async function POST(req: Request) {
       },
     });
   } catch (error: any) {
-    console.error("SAVE ERROR:", error);
-
     return NextResponse.json(
       {
         error: "Save failed",
@@ -64,14 +76,15 @@ export async function POST(req: Request) {
 
 export async function GET() {
   try {
+    const supabase = getSupabase();
+
     const { data, error } = await supabase
       .from("songs")
       .select("*")
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("SUPABASE GET ERROR:", error);
-      return NextResponse.json({ songs: [] });
+      return NextResponse.json({ songs: [], details: error.message });
     }
 
     const songs = data.map((song) => ({
@@ -85,14 +98,18 @@ export async function GET() {
     }));
 
     return NextResponse.json({ songs });
-  } catch {
-    return NextResponse.json({ songs: [] });
+  } catch (error: any) {
+    return NextResponse.json({
+      songs: [],
+      details: error?.message || String(error),
+    });
   }
 }
 
 export async function DELETE(req: Request) {
   try {
     const { id } = await req.json();
+    const supabase = getSupabase();
 
     const { data: song, error: findError } = await supabase
       .from("songs")
@@ -117,19 +134,14 @@ export async function DELETE(req: Request) {
       .eq("id", id);
 
     if (deleteError) {
-      console.error("SUPABASE DELETE ERROR:", deleteError);
       return NextResponse.json(
         { error: "Delete failed", details: deleteError.message },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({
-      message: "Deleted",
-    });
+    return NextResponse.json({ message: "Deleted" });
   } catch (error: any) {
-    console.error("DELETE ERROR:", error);
-
     return NextResponse.json(
       {
         error: "Delete failed",
