@@ -19,14 +19,24 @@ type Song = {
   createdAt?: string;
 };
 
+type Playlist = {
+  id: string;
+  name: string;
+  created_at?: string;
+};
+
 export default function LibraryPage() {
   const [songs, setSongs] = useState<Song[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState("");
+  const [newPlaylistName, setNewPlaylistName] = useState("");
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"public" | "mine" | "favorites">("public");
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [likingId, setLikingId] = useState<string | null>(null);
+  const [addingPlaylistSongId, setAddingPlaylistSongId] = useState<string | null>(null);
   const [likedSongIds, setLikedSongIds] = useState<string[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -40,6 +50,95 @@ export default function LibraryPage() {
   const getToken = async () => {
     const { data } = await supabase.auth.getSession();
     return data.session?.access_token || null;
+  };
+
+  const fetchPlaylists = async () => {
+    const token = await getToken();
+    if (!token) {
+      setPlaylists([]);
+      return;
+    }
+
+    const res = await fetch("/api/playlists", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const data = await res.json();
+    setPlaylists(data.playlists || []);
+  };
+
+  const createPlaylist = async () => {
+    const token = await getToken();
+
+    if (!token) {
+      alert("Please log in to create playlists.");
+      return;
+    }
+
+    if (!newPlaylistName.trim()) {
+      alert("Enter a playlist name.");
+      return;
+    }
+
+    const res = await fetch("/api/playlists", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ name: newPlaylistName.trim() }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data?.error || "Could not create playlist.");
+      return;
+    }
+
+    setNewPlaylistName("");
+    await fetchPlaylists();
+  };
+
+  const addToPlaylist = async (songId: string) => {
+    const token = await getToken();
+
+    if (!token) {
+      alert("Please log in to add songs to playlists.");
+      return;
+    }
+
+    if (!selectedPlaylistId) {
+      alert("Create or select a playlist first.");
+      return;
+    }
+
+    setAddingPlaylistSongId(songId);
+
+    try {
+      const res = await fetch("/api/playlists/songs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          playlistId: selectedPlaylistId,
+          songId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data?.details || data?.error || "Could not add to playlist.");
+        return;
+      }
+
+      alert("Added to playlist ✅");
+    } finally {
+      setAddingPlaylistSongId(null);
+    }
   };
 
   const fetchLikes = async () => {
@@ -176,6 +275,7 @@ export default function LibraryPage() {
     fetchUser();
     fetchSongs();
     fetchLikes();
+    fetchPlaylists();
   }, []);
 
   return (
@@ -309,9 +409,52 @@ export default function LibraryPage() {
             </div>
           </div>
 
+          {userId && (
+            <div className="mt-5 rounded-2xl border border-zinc-800 bg-black/70 p-4">
+              <p className="mb-3 text-sm font-black uppercase tracking-widest text-orange-400">
+                Playlists
+              </p>
+
+              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                <input
+                  value={newPlaylistName}
+                  onChange={(e) => setNewPlaylistName(e.target.value)}
+                  placeholder="New playlist name..."
+                  className="rounded-xl border border-zinc-800 bg-black p-3 text-white outline-none focus:border-orange-500"
+                />
+
+                <button
+                  onClick={createPlaylist}
+                  className="rounded-xl bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:bg-orange-400 active:scale-95"
+                >
+                  Create Playlist
+                </button>
+              </div>
+
+              <select
+                value={selectedPlaylistId}
+                onChange={(e) => setSelectedPlaylistId(e.target.value)}
+                className="mt-3 w-full rounded-xl border border-zinc-800 bg-black p-3 text-white outline-none focus:border-orange-500"
+              >
+                <option value="">Select playlist to add songs...</option>
+                {playlists.map((playlist) => (
+                  <option key={playlist.id} value={playlist.id}>
+                    {playlist.name}
+                  </option>
+                ))}
+              </select>
+
+              {playlists.length > 0 && (
+                <p className="mt-3 text-xs text-zinc-500">
+                  Your playlists: {playlists.map((p) => p.name).join(", ")}
+                </p>
+              )}
+            </div>
+          )}
+
           {!userId && (
             <p className="mt-4 rounded-xl border border-orange-900 bg-orange-950/30 p-3 text-sm text-orange-200">
-              Log in to view your uploads, favorite tracks, and delete tracks you uploaded.
+              Log in to view your uploads, favorite tracks, create playlists, and delete tracks you uploaded.
             </p>
           )}
         </div>
@@ -422,7 +565,7 @@ export default function LibraryPage() {
                       <source src={song.url} />
                     </audio>
 
-                    <div className="mt-5 flex gap-2">
+                    <div className="mt-5 flex flex-wrap gap-2">
                       <button
                         onClick={() => setCurrentSong(song)}
                         className="flex-1 rounded-full bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:bg-orange-400 active:scale-95"
@@ -441,6 +584,16 @@ export default function LibraryPage() {
                       >
                         {isLiked ? "❤️" : "♡"}
                       </button>
+
+                      {userId && (
+                        <button
+                          onClick={() => addToPlaylist(song.id)}
+                          disabled={addingPlaylistSongId === song.id}
+                          className="rounded-full bg-zinc-800 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {addingPlaylistSongId === song.id ? "..." : "+ Playlist"}
+                        </button>
+                      )}
 
                       {isOwner && (
                         <button
