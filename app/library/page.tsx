@@ -585,6 +585,15 @@ export default function LibraryPage() {
                         {isLiked ? "❤️" : "♡"}
                       </button>
 
+                      {song.userId && (
+                        <a
+                          href={`/artist/${song.userId}`}
+                          className="rounded-full bg-zinc-800 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-700 active:scale-95"
+                        >
+                          Artist
+                        </a>
+                      )}
+
                       {userId && (
                         <button
                           onClick={() => addToPlaylist(song.id)}
