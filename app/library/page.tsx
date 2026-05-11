@@ -52,6 +52,26 @@ export default function LibraryPage() {
     return data.session?.access_token || null;
   };
 
+  const markRecentlyPlayed = async (songId: string) => {
+    const token = await getToken();
+
+    if (!token) return;
+
+    await fetch("/api/recently-played", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ songId }),
+    });
+  };
+
+  const playSong = async (song: Song) => {
+    setCurrentSong(song);
+    await markRecentlyPlayed(song.id);
+  };
+
   const fetchPlaylists = async () => {
     const token = await getToken();
     if (!token) {
@@ -567,7 +587,7 @@ export default function LibraryPage() {
 
                     <div className="mt-5 flex flex-wrap gap-2">
                       <button
-                        onClick={() => setCurrentSong(song)}
+                        onClick={() => playSong(song)}
                         className="flex-1 rounded-full bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:bg-orange-400 active:scale-95"
                       >
                         Play
