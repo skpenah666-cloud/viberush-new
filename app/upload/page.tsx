@@ -17,6 +17,7 @@ export default function UploadPage() {
   const [fileUrl, setFileUrl] = useState("");
   const [coverPreview, setCoverPreview] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
@@ -30,34 +31,56 @@ export default function UploadPage() {
 
   const uploadToCloudinary = async (
     selectedFile: File,
-    resourceType: "video" | "image"
+    resourceType: "video" | "image",
+    progressStart: number,
+    progressEnd: number
   ) => {
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
-    const cloudData = new FormData();
-    cloudData.append("file", selectedFile);
-    cloudData.append("upload_preset", uploadPreset || "");
-    cloudData.append("folder", "viberush");
+    return new Promise<any>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
 
-    const cloudRes = await fetch(
-      `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
-      {
-        method: "POST",
-        body: cloudData,
-      }
-    );
-
-    const cloudinaryFile = await cloudRes.json();
-
-    if (!cloudRes.ok) {
-      console.error(cloudinaryFile);
-      throw new Error(
-        cloudinaryFile?.error?.message || "Cloudinary upload failed"
+      xhr.open(
+        "POST",
+        `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`
       );
-    }
 
-    return cloudinaryFile;
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round(
+            progressStart +
+              (event.loaded / event.total) *
+                (progressEnd - progressStart)
+          );
+
+          setUploadProgress(percent);
+        }
+      });
+
+      xhr.onload = () => {
+        const response = JSON.parse(xhr.responseText);
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(response);
+        } else {
+          reject(
+            new Error(
+              response?.error?.message || "Cloudinary upload failed"
+            )
+          );
+        }
+      };
+
+      xhr.onerror = () => reject(new Error("Upload failed"));
+
+      const cloudData = new FormData();
+      cloudData.append("file", selectedFile);
+      cloudData.append("upload_preset", uploadPreset || "");
+      cloudData.append("folder", "viberush");
+
+      xhr.send(cloudData);
+    });
   };
 
   const handleSubmit = async () => {
@@ -73,20 +96,34 @@ export default function UploadPage() {
 
     try {
       setIsUploading(true);
-      setMessage("Uploading audio to Cloudinary...");
+      setUploadProgress(0);
+      setMessage("Uploading audio...");
       setFileUrl("");
 
-      const cloudinaryAudio = await uploadToCloudinary(file, "video");
+      const cloudinaryAudio = await uploadToCloudinary(
+        file,
+        "video",
+        0,
+        coverFile ? 70 : 90
+      );
 
       let coverUrl = "";
 
       if (coverFile) {
         setMessage("Uploading cover art...");
-        const cloudinaryCover = await uploadToCloudinary(coverFile, "image");
+
+        const cloudinaryCover = await uploadToCloudinary(
+          coverFile,
+          "image",
+          70,
+          90
+        );
+
         coverUrl = cloudinaryCover.secure_url;
       }
 
-      setMessage("Saving track to your account...");
+      setUploadProgress(95);
+      setMessage("Saving track to library...");
 
       const saveRes = await fetch("/api/upload", {
         method: "POST",
@@ -108,23 +145,32 @@ export default function UploadPage() {
 
       if (!saveRes.ok) {
         console.error(saveData);
+
         return setMessage(
           saveData?.details ||
             saveData?.error ||
-            "Uploaded to Cloudinary, but saving to library failed."
+            "Saving to library failed."
         );
       }
 
+      setUploadProgress(100);
       setMessage("Upload successful ✅");
+
       setFileUrl(cloudinaryAudio.secure_url);
+
       setTitle("");
       setArtist("");
       setFile(null);
       setCoverFile(null);
       setCoverPreview("");
+
+      setTimeout(() => {
+        setUploadProgress(0);
+      }, 2000);
     } catch (error: any) {
       console.error(error);
-      setMessage(error?.message || "Upload failed. Try again.");
+      setMessage(error?.message || "Upload failed.");
+      setUploadProgress(0);
     } finally {
       setIsUploading(false);
     }
@@ -147,14 +193,14 @@ export default function UploadPage() {
           {userEmail ? (
             <button
               onClick={logout}
-              className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-bold transition hover:bg-zinc-900 active:scale-95"
+              className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-bold transition hover:bg-zinc-900"
             >
               Logout
             </button>
           ) : (
             <a
               href="/auth"
-              className="rounded-full bg-orange-500 px-5 py-2 text-sm font-black text-black transition hover:bg-orange-400 active:scale-95"
+              className="rounded-full bg-orange-500 px-5 py-2 text-sm font-black text-black transition hover:bg-orange-400"
             >
               Login
             </a>
@@ -162,7 +208,7 @@ export default function UploadPage() {
 
           <a
             href="/library"
-            className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-bold transition hover:bg-zinc-900 active:scale-95"
+            className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-bold transition hover:bg-zinc-900"
           >
             Library
           </a>
@@ -188,9 +234,6 @@ export default function UploadPage() {
           ) : (
             <div className="mt-5 rounded-xl border border-orange-900 bg-orange-950/40 p-4 text-sm text-orange-200">
               You must be logged in to upload.
-              <a href="/auth" className="ml-2 font-black underline">
-                Login or sign up
-              </a>
             </div>
           )}
 
@@ -209,7 +252,7 @@ export default function UploadPage() {
           />
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <label className="block cursor-pointer rounded-2xl border border-dashed border-orange-500/50 bg-black/60 p-7 text-center transition hover:bg-orange-500/10 active:scale-95">
+            <label className="block cursor-pointer rounded-2xl border border-dashed border-orange-500/50 bg-black/60 p-7 text-center transition hover:bg-orange-500/10">
               <input
                 type="file"
                 accept="audio/*"
@@ -225,10 +268,12 @@ export default function UploadPage() {
                 Choose audio
               </span>
 
-              <p className="mt-2 text-sm text-zinc-500">MP3, WAV, M4A</p>
+              <p className="mt-2 text-sm text-zinc-500">
+                MP3, WAV, M4A
+              </p>
             </label>
 
-            <label className="block cursor-pointer rounded-2xl border border-dashed border-zinc-700 bg-black/60 p-7 text-center transition hover:bg-zinc-900 active:scale-95">
+            <label className="block cursor-pointer rounded-2xl border border-dashed border-zinc-700 bg-black/60 p-7 text-center transition hover:bg-zinc-900">
               <input
                 type="file"
                 accept="image/*"
@@ -236,7 +281,6 @@ export default function UploadPage() {
                 onChange={(e) => {
                   const selectedCover = e.target.files?.[0] || null;
                   setCoverFile(selectedCover);
-                  setMessage("");
 
                   if (selectedCover) {
                     setCoverPreview(URL.createObjectURL(selectedCover));
@@ -250,7 +294,9 @@ export default function UploadPage() {
                 Add cover art
               </span>
 
-              <p className="mt-2 text-sm text-zinc-500">Optional JPG, PNG</p>
+              <p className="mt-2 text-sm text-zinc-500">
+                Optional JPG, PNG
+              </p>
             </label>
           </div>
 
@@ -272,10 +318,33 @@ export default function UploadPage() {
             </div>
           )}
 
+          {isUploading && (
+            <div className="mt-6">
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span className="font-bold text-orange-300">
+                  Uploading...
+                </span>
+
+                <span className="font-black text-orange-400">
+                  {uploadProgress}%
+                </span>
+              </div>
+
+              <div className="h-4 overflow-hidden rounded-full bg-zinc-800">
+                <div
+                  className="h-full rounded-full bg-orange-500 transition-all duration-300"
+                  style={{
+                    width: `${uploadProgress}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           <button
             onClick={handleSubmit}
             disabled={isUploading || !userEmail}
-            className="mt-6 w-full rounded-full bg-orange-500 px-6 py-4 font-black text-black transition hover:bg-orange-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-6 w-full rounded-full bg-orange-500 px-6 py-4 font-black text-black transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isUploading ? "Uploading..." : "Upload Track"}
           </button>
