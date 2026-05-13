@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import WaveformBars from "@/components/WaveformBars";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,33 +14,33 @@ type Song = {
   title: string;
   artist: string;
   url: string;
-  cover_url?: string | null;
   user_id?: string | null;
+  cover_url?: string | null;
   created_at?: string;
 };
 
-type PlayRow = {
+type Play = {
   song_id: string;
 };
 
 export default function TrendingPage() {
   const [songs, setSongs] = useState<Song[]>([]);
-  const [plays, setPlays] = useState<PlayRow[]>([]);
+  const [plays, setPlays] = useState<Play[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchTrending = async () => {
-      const { data: songData } = await supabase
+      const { data: songsData } = await supabase
         .from("songs")
         .select("*")
         .order("created_at", { ascending: false });
 
-      const { data: playData } = await supabase
+      const { data: playsData } = await supabase
         .from("recently_played")
         .select("song_id");
 
-      setSongs(songData || []);
-      setPlays(playData || []);
+      setSongs(songsData || []);
+      setPlays(playsData || []);
       setLoading(false);
     };
 
@@ -62,30 +63,30 @@ export default function TrendingPage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-black via-zinc-950 to-orange-950 pb-24 text-white">
-      <nav className="sticky top-0 z-20 flex items-center justify-between border-b border-zinc-900 bg-black/70 p-6 backdrop-blur-xl">
+      <nav className="sticky top-0 z-20 flex items-center justify-between border-b border-zinc-900 bg-black/70 p-4 backdrop-blur-xl md:p-6">
         <a href="/" className="text-2xl font-black text-orange-500">
           VibeRush
         </a>
 
-        <div className="flex gap-3">
+        <div className="flex gap-2 md:gap-3">
           <a
             href="/library"
-            className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-bold transition hover:bg-zinc-900"
+            className="rounded-full border border-zinc-700 px-4 py-2 text-sm font-bold transition hover:bg-zinc-900"
           >
             Library
           </a>
 
           <a
             href="/upload"
-            className="rounded-full bg-orange-500 px-5 py-2 text-sm font-black text-black transition hover:bg-orange-400"
+            className="rounded-full bg-orange-500 px-4 py-2 text-sm font-black text-black transition hover:bg-orange-400"
           >
             Upload
           </a>
         </div>
       </nav>
 
-      <section className="mx-auto max-w-6xl px-6 py-10">
-        <div className="mb-8 rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 shadow-2xl">
+      <section className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-10">
+        <div className="mb-8 rounded-3xl border border-zinc-800 bg-zinc-950/80 p-6 shadow-2xl md:p-8">
           <p className="text-sm font-bold uppercase tracking-widest text-orange-400">
             VibeRush Charts
           </p>
@@ -93,19 +94,22 @@ export default function TrendingPage() {
           <h1 className="mt-3 text-5xl font-black">Trending 🔥</h1>
 
           <p className="mt-3 max-w-xl text-zinc-400">
-            Tracks ranked by recent plays across the platform.
+            Tracks ranked by play activity across the platform.
           </p>
         </div>
 
         {loading ? (
           <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-10 text-center">
-            <p className="font-bold text-orange-300">Loading trending songs...</p>
+            <p className="font-bold text-orange-300">
+              Loading trending songs...
+            </p>
           </div>
         ) : trendingSongs.length === 0 ? (
           <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-10 text-center">
             <h2 className="text-2xl font-black">No trending songs yet</h2>
+
             <p className="mt-2 text-zinc-400">
-              Play some songs from the library and they will appear here.
+              Play songs from the library and they will appear here.
             </p>
           </div>
         ) : (
@@ -113,9 +117,9 @@ export default function TrendingPage() {
             {trendingSongs.map((song, index) => (
               <div
                 key={song.id}
-                className="grid gap-5 overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950/80 p-5 shadow-2xl md:grid-cols-[140px_1fr]"
+                className="grid gap-5 overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950/80 p-5 shadow-2xl md:grid-cols-[160px_1fr]"
               >
-                <div className="relative h-36 overflow-hidden rounded-2xl bg-zinc-900">
+                <div className="relative h-40 overflow-hidden rounded-2xl bg-zinc-900">
                   {song.cover_url ? (
                     <img
                       src={song.cover_url}
@@ -123,7 +127,7 @@ export default function TrendingPage() {
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-orange-950 via-black to-zinc-900 text-4xl">
+                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-orange-950 via-black to-zinc-900 text-5xl">
                       🎧
                     </div>
                   )}
@@ -146,9 +150,31 @@ export default function TrendingPage() {
                     <p className="truncate text-zinc-400">{song.artist}</p>
                   </div>
 
-                  <audio controls className="w-full">
-                    <source src={song.url} />
-                  </audio>
+                  <div className="space-y-3">
+                    <WaveformBars />
+
+                    <audio controls className="w-full rounded-xl">
+                      <source src={song.url} />
+                    </audio>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {song.user_id && (
+                      <a
+                        href={`/artist/${song.user_id}`}
+                        className="rounded-full bg-zinc-800 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-700"
+                      >
+                        View Artist
+                      </a>
+                    )}
+
+                    <a
+                      href="/library"
+                      className="rounded-full bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:bg-orange-400"
+                    >
+                      Open Library
+                    </a>
+                  </div>
                 </div>
               </div>
             ))}
