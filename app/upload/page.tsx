@@ -8,11 +8,22 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+const genres = [
+  "Afrobeats",
+  "Dancehall",
+  "Hip-Hop",
+  "Gospel",
+  "R&B",
+  "Amapiano",
+  "Other",
+];
+
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
+  const [genre, setGenre] = useState("Afrobeats");
   const [message, setMessage] = useState("");
   const [fileUrl, setFileUrl] = useState("");
   const [coverPreview, setCoverPreview] = useState("");
@@ -134,6 +145,7 @@ export default function UploadPage() {
         body: JSON.stringify({
           title: title || file.name.replace(/\.[^/.]+$/, ""),
           artist: artist || "Unknown Artist",
+          genre,
           url: cloudinaryAudio.secure_url,
           fileName: cloudinaryAudio.public_id,
           resourceType: cloudinaryAudio.resource_type,
@@ -160,6 +172,7 @@ export default function UploadPage() {
 
       setTitle("");
       setArtist("");
+      setGenre("Afrobeats");
       setFile(null);
       setCoverFile(null);
       setCoverPreview("");
@@ -224,7 +237,7 @@ export default function UploadPage() {
           <h1 className="text-4xl font-black">Drop your next sound</h1>
 
           <p className="mt-3 text-zinc-400">
-            Upload your audio, add cover art, and publish it to your account.
+            Upload your audio, add cover art, genre, and publish it to your account.
           </p>
 
           {userEmail ? (
@@ -250,6 +263,18 @@ export default function UploadPage() {
             placeholder="Artist name"
             className="mt-4 w-full rounded-xl border border-zinc-800 bg-black p-4 text-white outline-none focus:border-orange-500"
           />
+
+          <select
+            value={genre}
+            onChange={(e) => setGenre(e.target.value)}
+            className="mt-4 w-full rounded-xl border border-zinc-800 bg-black p-4 text-white outline-none focus:border-orange-500"
+          >
+            {genres.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <label className="block cursor-pointer rounded-2xl border border-dashed border-orange-500/50 bg-black/60 p-7 text-center transition hover:bg-orange-500/10">
