@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import WaveformBars from "@/components/WaveformBars";
-import MusicVisualizer from "@/components/MusicVisualizer";
+import { usePlayer } from "@/components/player/PlayerContext";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,7 +32,6 @@ export default function LibraryPage() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState("");
   const [newPlaylistName, setNewPlaylistName] = useState("");
-  const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"public" | "mine" | "favorites">("public");
   const [loading, setLoading] = useState(true);
@@ -42,6 +41,8 @@ export default function LibraryPage() {
   const [likedSongIds, setLikedSongIds] = useState<string[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  const { currentSong, playSong: startPlayer } = usePlayer();
 
   const fetchUser = async () => {
     const { data } = await supabase.auth.getUser();
@@ -89,7 +90,25 @@ export default function LibraryPage() {
   };
 
   const playSong = async (song: Song) => {
-    setCurrentSong(song);
+    startPlayer(
+      {
+        id: song.id,
+        title: song.title,
+        artist: song.artist,
+        url: song.url,
+        coverUrl: song.coverUrl,
+        userId: song.userId,
+      },
+      visibleSongs.map((item) => ({
+        id: item.id,
+        title: item.title,
+        artist: item.artist,
+        url: item.url,
+        coverUrl: item.coverUrl,
+        userId: item.userId,
+      }))
+    );
+
     await markRecentlyPlayed(song.id);
   };
 
@@ -234,7 +253,6 @@ export default function LibraryPage() {
       const result = await res.json();
       if (!res.ok) return alert(result?.error || "Delete failed.");
 
-      if (currentSong?.id === id) setCurrentSong(null);
       setLikedSongIds((current) => current.filter((songId) => songId !== id));
       await fetchSongs();
     } finally {
@@ -458,12 +476,13 @@ export default function LibraryPage() {
             {visibleSongs.map((song, index) => {
               const isOwner = userId && song.userId === userId;
               const isLiked = likedSongIds.includes(song.id);
+              const isCurrentSong = currentSong?.id === song.id;
 
               return (
                 <div
                   key={song.id}
                   className={`overflow-hidden rounded-3xl border shadow-2xl transition hover:-translate-y-1 ${
-                    currentSong?.id === song.id
+                    isCurrentSong
                       ? "border-orange-500 bg-orange-950/30 shadow-orange-900/30"
                       : "border-zinc-800 bg-zinc-950/80 hover:shadow-orange-900/20"
                   }`}
@@ -495,6 +514,12 @@ export default function LibraryPage() {
                         </p>
 
                         <div className="flex gap-2">
+                          {isCurrentSong && (
+                            <span className="rounded-full bg-green-500 px-3 py-1 text-xs font-black text-black">
+                              Playing
+                            </span>
+                          )}
+
                           {isOwner && (
                             <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-black text-black">
                               Yours
@@ -522,10 +547,6 @@ export default function LibraryPage() {
                   <div className="p-4 md:p-5">
                     <div className="space-y-3">
                       <WaveformBars />
-
-                      <audio controls className="w-full rounded-xl">
-                        <source src={song.url} />
-                      </audio>
                     </div>
 
                     <div className="mt-5 flex flex-wrap gap-2">
@@ -533,7 +554,7 @@ export default function LibraryPage() {
                         onClick={() => playSong(song)}
                         className="min-h-11 flex-1 rounded-full bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:bg-orange-400 active:scale-95"
                       >
-                        Play
+                        {isCurrentSong ? "Playing" : "Play"}
                       </button>
 
                       <a
@@ -598,48 +619,6 @@ export default function LibraryPage() {
           </div>
         )}
       </section>
-
-      {currentSong && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 overflow-hidden border-t border-zinc-800 bg-black/95 p-3 shadow-2xl backdrop-blur-xl md:p-4">
-          <MusicVisualizer />
-
-          <div className="relative mx-auto flex max-w-6xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-zinc-900 md:h-14 md:w-14">
-                {currentSong.coverUrl ? (
-                  <img
-                    src={currentSong.coverUrl}
-                    alt={`${currentSong.title} cover`}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-xl">
-                    🎧
-                  </div>
-                )}
-              </div>
-
-              <div className="min-w-0">
-                <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">
-                  Now Playing
-                </p>
-
-                <h3 className="truncate font-black text-orange-300">
-                  {currentSong.title}
-                </h3>
-
-                <p className="truncate text-sm text-zinc-400">
-                  {currentSong.artist}
-                </p>
-              </div>
-            </div>
-
-            <audio controls autoPlay className="w-full rounded-xl md:w-2/3">
-              <source src={currentSong.url} />
-            </audio>
-          </div>
-        </div>
-      )}
     </main>
   );
 }
