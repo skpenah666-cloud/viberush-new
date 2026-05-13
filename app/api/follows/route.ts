@@ -62,7 +62,10 @@ export async function GET(req: Request) {
     });
   } catch (error: any) {
     return NextResponse.json(
-      { error: "Failed to fetch follows", details: error?.message || String(error) },
+      {
+        error: "Failed to fetch follows",
+        details: error?.message || String(error),
+      },
       { status: 500 }
     );
   }
@@ -129,6 +132,13 @@ export async function POST(req: Request) {
         { status: 500 }
       );
     }
+
+    await supabase.from("notifications").insert({
+      user_id: artistId,
+      type: "follow",
+      message: `${user.email || "Someone"} followed your artist profile.`,
+      link: `/artist/${artistId}`,
+    });
 
     return NextResponse.json({ isFollowing: true });
   } catch (error: any) {

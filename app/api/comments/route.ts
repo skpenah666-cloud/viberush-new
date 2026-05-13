@@ -105,6 +105,21 @@ export async function POST(req: Request) {
       );
     }
 
+    const { data: song } = await supabase
+      .from("songs")
+      .select("id, title, user_id")
+      .eq("id", songId)
+      .maybeSingle();
+
+    if (song?.user_id && song.user_id !== user.id) {
+      await supabase.from("notifications").insert({
+        user_id: song.user_id,
+        type: "comment",
+        message: `${user.email || "Someone"} commented on your song "${song.title}".`,
+        link: `/song/${song.id}`,
+      });
+    }
+
     return NextResponse.json({ comment: data });
   } catch (error: any) {
     return NextResponse.json(
