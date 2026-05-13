@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import WaveformBars from "@/components/WaveformBars";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -581,9 +582,13 @@ export default function LibraryPage() {
                       </p>
                     )}
 
-                    <audio controls className="w-full rounded-xl">
-                      <source src={song.url} />
-                    </audio>
+                    <div className="space-y-3">
+                      <WaveformBars />
+
+                      <audio controls className="w-full rounded-xl">
+                        <source src={song.url} />
+                      </audio>
+                    </div>
 
                     <div className="mt-5 flex flex-wrap gap-2">
                       <button
