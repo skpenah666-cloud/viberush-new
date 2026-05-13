@@ -299,13 +299,13 @@ export default function LibraryPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-black via-zinc-950 to-orange-950 pb-36 text-white">
-      <nav className="sticky top-0 z-20 flex items-center justify-between border-b border-zinc-900 bg-black/70 p-6 backdrop-blur-xl">
+    <main className="min-h-screen bg-gradient-to-br from-black via-zinc-950 to-orange-950 pb-48 text-white md:pb-36">
+      <nav className="sticky top-0 z-20 flex items-center justify-between border-b border-zinc-900 bg-black/70 p-4 backdrop-blur-xl md:p-6">
         <a href="/" className="text-2xl font-black text-orange-500">
           VibeRush
         </a>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           {userEmail ? (
             <span className="hidden rounded-full border border-zinc-800 px-4 py-2 text-xs font-bold text-zinc-400 md:inline">
               {userEmail}
@@ -313,7 +313,7 @@ export default function LibraryPage() {
           ) : (
             <a
               href="/auth"
-              className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-bold transition hover:bg-zinc-900 active:scale-95"
+              className="rounded-full border border-zinc-700 px-4 py-2 text-sm font-bold transition hover:bg-zinc-900 active:scale-95 md:px-5"
             >
               Login
             </a>
@@ -321,22 +321,22 @@ export default function LibraryPage() {
 
           <a
             href="/upload"
-            className="rounded-full bg-orange-500 px-5 py-2 text-sm font-black text-black transition hover:bg-orange-400 active:scale-95"
+            className="rounded-full bg-orange-500 px-4 py-2 text-sm font-black text-black transition hover:bg-orange-400 active:scale-95 md:px-5"
           >
             Upload
           </a>
         </div>
       </nav>
 
-      <section className="mx-auto max-w-6xl px-6 py-10">
-        <div className="mb-8 rounded-3xl border border-zinc-800 bg-zinc-950/70 p-8 shadow-2xl">
+      <section className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-10">
+        <div className="mb-8 rounded-3xl border border-zinc-800 bg-zinc-950/70 p-5 shadow-2xl md:p-8">
           <p className="text-sm font-bold uppercase tracking-widest text-orange-400">
             Music Vault
           </p>
 
           <div className="mt-3 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div>
-              <h1 className="text-5xl font-black">
+              <h1 className="text-4xl font-black md:text-5xl">
                 {view === "mine"
                   ? "My Uploads 🎙️"
                   : view === "favorites"
@@ -353,9 +353,9 @@ export default function LibraryPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-2xl border border-zinc-800 bg-black/70 px-4 py-4 text-right">
-                <p className="text-3xl font-black text-orange-400">
+            <div className="grid grid-cols-3 gap-2 md:gap-3">
+              <div className="rounded-2xl border border-zinc-800 bg-black/70 px-3 py-4 text-right md:px-4">
+                <p className="text-2xl font-black text-orange-400 md:text-3xl">
                   {songs.length}
                 </p>
                 <p className="text-xs uppercase tracking-widest text-zinc-500">
@@ -363,8 +363,8 @@ export default function LibraryPage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-zinc-800 bg-black/70 px-4 py-4 text-right">
-                <p className="text-3xl font-black text-orange-400">
+              <div className="rounded-2xl border border-zinc-800 bg-black/70 px-3 py-4 text-right md:px-4">
+                <p className="text-2xl font-black text-orange-400 md:text-3xl">
                   {userId ? myUploadCount : 0}
                 </p>
                 <p className="text-xs uppercase tracking-widest text-zinc-500">
@@ -372,8 +372,8 @@ export default function LibraryPage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-zinc-800 bg-black/70 px-4 py-4 text-right">
-                <p className="text-3xl font-black text-orange-400">
+              <div className="rounded-2xl border border-zinc-800 bg-black/70 px-3 py-4 text-right md:px-4">
+                <p className="text-2xl font-black text-orange-400 md:text-3xl">
                   {likedSongIds.length}
                 </p>
                 <p className="text-xs uppercase tracking-widest text-zinc-500">
@@ -391,7 +391,7 @@ export default function LibraryPage() {
               className="w-full rounded-2xl border border-zinc-800 bg-black p-4 text-white outline-none transition placeholder:text-zinc-600 focus:border-orange-500"
             />
 
-            <div className="flex shrink-0 rounded-2xl border border-zinc-800 bg-black p-1">
+            <div className="flex shrink-0 overflow-x-auto rounded-2xl border border-zinc-800 bg-black p-1">
               <button
                 onClick={() => setView("public")}
                 className={`rounded-xl px-4 py-3 text-sm font-black transition ${
@@ -509,7 +509,7 @@ export default function LibraryPage() {
             </p>
           </div>
         ) : (
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 md:gap-5">
             {visibleSongs.map((song, index) => {
               const isOwner = userId && song.userId === userId;
               const isLiked = likedSongIds.includes(song.id);
@@ -523,7 +523,7 @@ export default function LibraryPage() {
                       : "border-zinc-800 bg-zinc-950/80 hover:shadow-orange-900/20"
                   }`}
                 >
-                  <div className="relative h-56 bg-zinc-900">
+                  <div className="relative h-52 bg-zinc-900 md:h-56">
                     {song.coverUrl ? (
                       <img
                         src={song.coverUrl}
@@ -574,21 +574,21 @@ export default function LibraryPage() {
                     </div>
                   </div>
 
-                  <div className="p-5">
+                  <div className="p-4 md:p-5">
                     {song.createdAt && (
                       <p className="mb-4 text-xs text-zinc-600">
                         Added {new Date(song.createdAt).toLocaleDateString()}
                       </p>
                     )}
 
-                    <audio controls className="w-full">
+                    <audio controls className="w-full rounded-xl">
                       <source src={song.url} />
                     </audio>
 
                     <div className="mt-5 flex flex-wrap gap-2">
                       <button
                         onClick={() => playSong(song)}
-                        className="flex-1 rounded-full bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:bg-orange-400 active:scale-95"
+                        className="min-h-11 flex-1 rounded-full bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:bg-orange-400 active:scale-95"
                       >
                         Play
                       </button>
@@ -596,7 +596,7 @@ export default function LibraryPage() {
                       <button
                         onClick={() => toggleLike(song.id)}
                         disabled={likingId === song.id}
-                        className={`rounded-full px-5 py-3 text-sm font-black transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
+                        className={`min-h-11 rounded-full px-5 py-3 text-sm font-black transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
                           isLiked
                             ? "bg-red-600 text-white hover:bg-red-500"
                             : "bg-zinc-800 text-white hover:bg-zinc-700"
@@ -608,7 +608,7 @@ export default function LibraryPage() {
                       {song.userId && (
                         <a
                           href={`/artist/${song.userId}`}
-                          className="rounded-full bg-zinc-800 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-700 active:scale-95"
+                          className="min-h-11 rounded-full bg-zinc-800 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-700 active:scale-95"
                         >
                           Artist
                         </a>
@@ -618,7 +618,7 @@ export default function LibraryPage() {
                         <button
                           onClick={() => addToPlaylist(song.id)}
                           disabled={addingPlaylistSongId === song.id}
-                          className="rounded-full bg-zinc-800 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="min-h-11 rounded-full bg-zinc-800 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {addingPlaylistSongId === song.id ? "..." : "+ Playlist"}
                         </button>
@@ -628,7 +628,7 @@ export default function LibraryPage() {
                         <button
                           onClick={() => deleteSong(song.id)}
                           disabled={deletingId === song.id}
-                          className="rounded-full bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="min-h-11 rounded-full bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {deletingId === song.id ? "..." : "Delete"}
                         </button>
@@ -643,10 +643,10 @@ export default function LibraryPage() {
       </section>
 
       {currentSong && (
-        <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-black/95 p-4 shadow-2xl backdrop-blur-xl">
-          <div className="mx-auto flex max-w-6xl flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-800 bg-black/95 p-3 shadow-2xl backdrop-blur-xl md:p-4">
+          <div className="mx-auto flex max-w-6xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-zinc-900">
+              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-zinc-900 md:h-14 md:w-14">
                 {currentSong.coverUrl ? (
                   <img
                     src={currentSong.coverUrl}
@@ -675,7 +675,7 @@ export default function LibraryPage() {
               </div>
             </div>
 
-            <audio controls autoPlay className="w-full md:w-2/3">
+            <audio controls autoPlay className="w-full rounded-xl md:w-2/3">
               <source src={currentSong.url} />
             </audio>
           </div>
