@@ -53,7 +53,10 @@ export async function GET(req: Request) {
     });
   } catch (error: any) {
     return NextResponse.json(
-      { error: "Failed to fetch likes", details: error?.message || String(error) },
+      {
+        error: "Failed to fetch likes",
+        details: error?.message || String(error),
+      },
       { status: 500 }
     );
   }
@@ -112,6 +115,21 @@ export async function POST(req: Request) {
         { error: "Failed to like song", details: error.message },
         { status: 500 }
       );
+    }
+
+    const { data: song } = await supabase
+      .from("songs")
+      .select("id, title, user_id")
+      .eq("id", songId)
+      .maybeSingle();
+
+    if (song?.user_id && song.user_id !== user.id) {
+      await supabase.from("notifications").insert({
+        user_id: song.user_id,
+        type: "like",
+        message: `${user.email || "Someone"} liked your song "${song.title}".`,
+        link: `/song/${song.id}`,
+      });
     }
 
     return NextResponse.json({ liked: true });
