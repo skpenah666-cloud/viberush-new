@@ -1,6 +1,13 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 const navItems = [
   {
@@ -14,9 +21,10 @@ const navItems = [
     icon: "🎶",
   },
   {
-    href: "/activity",
-    label: "Activity",
-    icon: "⚡",
+    href: "/notifications",
+    label: "Alerts",
+    icon: "🔔",
+    hasBadge: true,
   },
   {
     href: "/library",
@@ -32,6 +40,43 @@ const navItems = [
 
 export default function MobileNav() {
   const pathname = usePathname();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const getToken = async () => {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token || null;
+  };
+
+  const fetchUnreadCount = async () => {
+    const token = await getToken();
+
+    if (!token) {
+      setUnreadCount(0);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/notifications", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+
+      const unread = (data.notifications || []).filter(
+        (item: { is_read: boolean }) => !item.is_read
+      ).length;
+
+      setUnreadCount(unread);
+    } catch {
+      setUnreadCount(0);
+    }
+  };
+
+  useEffect(() => {
+    fetchUnreadCount();
+  }, [pathname]);
 
   return (
     <>
@@ -53,12 +98,18 @@ export default function MobileNav() {
               <a
                 key={item.href}
                 href={item.href}
-                className={`flex min-w-0 flex-1 flex-col items-center justify-center rounded-2xl px-2 py-3 text-center transition active:scale-95 ${
+                className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-2xl px-2 py-3 text-center transition active:scale-95 ${
                   active
                     ? "bg-orange-500 text-black"
                     : "text-zinc-500 hover:bg-zinc-900 hover:text-white"
                 }`}
               >
+                {item.hasBadge && unreadCount > 0 && (
+                  <span className="absolute right-3 top-2 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white ring-2 ring-black">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+
                 <span className="text-xl">{item.icon}</span>
 
                 <span className="mt-1 truncate text-[11px] font-black uppercase tracking-wide">
