@@ -19,6 +19,21 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "VibeRush",
   description: "Upload, stream, and discover music on VibeRush.",
+  manifest: "/manifest.json",
+  themeColor: "#f97316",
+  appleWebApp: {
+    capable: true,
+    title: "VibeRush",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
+  },
+};
+
+export const viewport = {
+  themeColor: "#f97316",
 };
 
 export default function RootLayout({
