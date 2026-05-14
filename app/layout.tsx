@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import { PlayerProvider } from "@/components/player/PlayerContext";
 import GlobalPlayer from "@/components/player/GlobalPlayer";
 import MobileNav from "@/components/navigation/MobileNav";
+import RegisterServiceWorker from "@/components/RegisterServiceWorker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,19 +21,38 @@ export const metadata: Metadata = {
   title: "VibeRush",
   description: "Upload, stream, and discover music on VibeRush.",
   manifest: "/manifest.json",
-  themeColor: "#f97316",
+
   appleWebApp: {
     capable: true,
     title: "VibeRush",
     statusBarStyle: "black-translucent",
   },
+
   icons: {
-    icon: "/icon-192.png",
-    apple: "/icon-192.png",
+    icon: [
+      {
+        url: "/icon-192.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+      {
+        url: "/icon-512.png",
+        sizes: "512x512",
+        type: "image/png",
+      },
+    ],
+
+    apple: [
+      {
+        url: "/icon-192.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+    ],
   },
 };
 
-export const viewport = {
+export const viewport: Viewport = {
   themeColor: "#f97316",
 };
 
@@ -48,6 +68,8 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-black text-white">
         <PlayerProvider>
+          <RegisterServiceWorker />
+
           <div className="relative flex min-h-screen flex-col">
             <main className="flex-1 pb-36 md:pb-32">
               {children}
