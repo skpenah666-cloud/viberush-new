@@ -38,20 +38,34 @@ export async function GET(req: Request) {
     const user = await getUserFromRequest(req);
     const supabase = getSupabase();
 
-    const { count } = await supabase
+    const { count, error: countError } = await supabase
       .from("follows")
       .select("*", { count: "exact", head: true })
       .eq("artist_id", artistId);
 
+    if (countError) {
+      return NextResponse.json(
+        { error: "Failed to count followers", details: countError.message },
+        { status: 500 }
+      );
+    }
+
     let isFollowing = false;
 
     if (user) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("follows")
-        .select("*")
+        .select("id")
         .eq("artist_id", artistId)
         .eq("follower_id", user.id)
         .maybeSingle();
+
+      if (error) {
+        return NextResponse.json(
+          { error: "Failed to check follow status", details: error.message },
+          { status: 500 }
+        );
+      }
 
       isFollowing = !!data;
     }
@@ -97,19 +111,25 @@ export async function POST(req: Request) {
 
     const supabase = getSupabase();
 
-    const { data: existingFollow } = await supabase
+    const { data: existingFollow, error: existingError } = await supabase
       .from("follows")
-      .select("*")
+      .select("id")
       .eq("follower_id", user.id)
       .eq("artist_id", artistId)
       .maybeSingle();
+
+    if (existingError) {
+      return NextResponse.json(
+        { error: "Failed to check existing follow", details: existingError.message },
+        { status: 500 }
+      );
+    }
 
     if (existingFollow) {
       const { error } = await supabase
         .from("follows")
         .delete()
-        .eq("follower_id", user.id)
-        .eq("artist_id", artistId);
+        .eq("id", existingFollow.id);
 
       if (error) {
         return NextResponse.json(
@@ -118,7 +138,15 @@ export async function POST(req: Request) {
         );
       }
 
-      return NextResponse.json({ isFollowing: false });
+      const { count } = await supabase
+        .from("follows")
+        .select("*", { count: "exact", head: true })
+        .eq("artist_id", artistId);
+
+      return NextResponse.json({
+        isFollowing: false,
+        followerCount: count || 0,
+      });
     }
 
     const { error } = await supabase.from("follows").insert({
@@ -140,7 +168,15 @@ export async function POST(req: Request) {
       link: `/artist/${artistId}`,
     });
 
-    return NextResponse.json({ isFollowing: true });
+    const { count } = await supabase
+      .from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("artist_id", artistId);
+
+    return NextResponse.json({
+      isFollowing: true,
+      followerCount: count || 0,
+    });
   } catch (error: any) {
     return NextResponse.json(
       { error: "Follow failed", details: error?.message || String(error) },
