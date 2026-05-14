@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import WaveformBars from "@/components/WaveformBars";
 import { usePlayer } from "@/components/player/PlayerContext";
@@ -26,6 +26,10 @@ export default function ArtistPage({ params }: { params: { id: string } }) {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(
+    null
+  );
 
   const { currentSong, playSong: startPlayer } = usePlayer();
 
@@ -93,7 +97,7 @@ export default function ArtistPage({ params }: { params: { id: string } }) {
       }
 
       setIsFollowing(Boolean(data.isFollowing));
-      await fetchFollowStatus();
+      setFollowerCount(data.followerCount || 0);
     } finally {
       setFollowLoading(false);
     }
@@ -124,6 +128,36 @@ export default function ArtistPage({ params }: { params: { id: string } }) {
     fetchUser();
     fetchArtistSongs();
     fetchFollowStatus();
+  }, [params.id]);
+
+  useEffect(() => {
+    if (realtimeChannelRef.current) {
+      supabase.removeChannel(realtimeChannelRef.current);
+    }
+
+    const channel = supabase
+      .channel(`artist-follows-${params.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "follows",
+          filter: `artist_id=eq.${params.id}`,
+        },
+        () => {
+          fetchFollowStatus();
+        }
+      )
+      .subscribe();
+
+    realtimeChannelRef.current = channel;
+
+    return () => {
+      if (realtimeChannelRef.current) {
+        supabase.removeChannel(realtimeChannelRef.current);
+      }
+    };
   }, [params.id]);
 
   const artistName = songs[0]?.artist || "Artist";
@@ -159,43 +193,71 @@ export default function ArtistPage({ params }: { params: { id: string } }) {
       </nav>
 
       <section className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-10">
-        <div className="mb-8 rounded-3xl border border-zinc-800 bg-zinc-950/80 p-6 shadow-2xl md:p-8">
-          <p className="text-sm font-bold uppercase tracking-widest text-orange-400">
-            Artist Profile
-          </p>
+        <div className="mb-8 overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950/80 shadow-2xl">
+          <div className="relative p-6 md:p-8">
+            <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-orange-500/10 blur-3xl" />
 
-          <div className="mt-3 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h1 className="text-5xl font-black">{artistName}</h1>
-
-              <p className="mt-3 text-zinc-400">
-                {loading
-                  ? "Loading artist catalog..."
-                  : `${songs.length} track${
-                      songs.length === 1 ? "" : "s"
-                    } uploaded`}
+            <div className="relative">
+              <p className="text-sm font-bold uppercase tracking-widest text-orange-400">
+                Artist Profile
               </p>
 
-              <p className="mt-2 text-sm font-bold text-orange-300">
-                {followerCount} follower{followerCount === 1 ? "" : "s"}
-              </p>
+              <div className="mt-3 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h1 className="text-5xl font-black">{artistName}</h1>
+
+                    <span className="rounded-full border border-green-500/40 bg-green-950/30 px-4 py-2 text-xs font-black text-green-300">
+                      LIVE AUDIENCE
+                    </span>
+                  </div>
+
+                  <p className="mt-3 text-zinc-400">
+                    {loading
+                      ? "Loading artist catalog..."
+                      : `${songs.length} track${
+                          songs.length === 1 ? "" : "s"
+                        } uploaded`}
+                  </p>
+
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <div className="rounded-2xl border border-zinc-800 bg-black/60 px-5 py-4">
+                      <p className="text-3xl font-black text-orange-400">
+                        {followerCount}
+                      </p>
+                      <p className="text-xs uppercase tracking-widest text-zinc-500">
+                        Followers
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-zinc-800 bg-black/60 px-5 py-4">
+                      <p className="text-3xl font-black text-orange-400">
+                        {songs.length}
+                      </p>
+                      <p className="text-xs uppercase tracking-widest text-zinc-500">
+                        Tracks
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={toggleFollow}
+                  disabled={followLoading}
+                  className={`rounded-full px-6 py-3 text-sm font-black transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
+                    isFollowing
+                      ? "border border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800"
+                      : "bg-orange-500 text-black hover:bg-orange-400"
+                  }`}
+                >
+                  {followLoading
+                    ? "Please wait..."
+                    : isFollowing
+                      ? "Following"
+                      : "Follow Artist"}
+                </button>
+              </div>
             </div>
-
-            <button
-              onClick={toggleFollow}
-              disabled={followLoading}
-              className={`rounded-full px-6 py-3 text-sm font-black transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
-                isFollowing
-                  ? "border border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800"
-                  : "bg-orange-500 text-black hover:bg-orange-400"
-              }`}
-            >
-              {followLoading
-                ? "Please wait..."
-                : isFollowing
-                  ? "Following"
-                  : "Follow Artist"}
-            </button>
           </div>
         </div>
 
