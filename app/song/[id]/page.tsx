@@ -38,18 +38,30 @@ export default function SongPage({
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentBody, setCommentBody] = useState("");
   const [message, setMessage] = useState("");
-  const [userEmail, setUserEmail] = useState<string | null>(
-    null
-  );
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [likeLoading, setLikeLoading] = useState(false);
 
   const realtimeChannelRef =
     useRef<ReturnType<typeof supabase.channel> | null>(
       null
     );
 
+  const likesRealtimeRef =
+    useRef<ReturnType<typeof supabase.channel> | null>(
+      null
+    );
+
   const { currentSong, playSong: startPlayer } =
     usePlayer();
+
+  const getToken = async () => {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token || null;
+  };
 
   const fetchSong = async () => {
     const { data } = await supabase
@@ -78,12 +90,68 @@ export default function SongPage({
     setComments(data.comments || []);
   };
 
+  const fetchLikes = async () => {
+    const token = await getToken();
+
+    const res = await fetch(
+      `/api/likes?songId=${params.id}`,
+      {
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : {},
+      }
+    );
+
+    const data = await res.json();
+
+    setLiked(Boolean(data.liked));
+    setLikeCount(data.likeCount || 0);
+  };
+
+  const toggleLike = async () => {
+    const token = await getToken();
+
+    if (!token) {
+      setMessage("Please log in to like songs.");
+      return;
+    }
+
+    setLikeLoading(true);
+
+    try {
+      const res = await fetch("/api/likes", {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+
+        body: JSON.stringify({
+          songId: params.id,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMessage(data?.error || "Like failed.");
+        return;
+      }
+
+      setLiked(Boolean(data.liked));
+      setLikeCount(data.likeCount || 0);
+    } finally {
+      setLikeLoading(false);
+    }
+  };
+
   const addComment = async () => {
     if (!commentBody.trim()) return;
 
-    const { data } = await supabase.auth.getSession();
-
-    const token = data.session?.access_token;
+    const token = await getToken();
 
     if (!token) {
       setMessage("Please log in to comment.");
@@ -132,6 +200,7 @@ export default function SongPage({
     fetchSong();
     fetchUser();
     fetchComments();
+    fetchLikes();
   }, [params.id]);
 
   useEffect(() => {
@@ -171,6 +240,38 @@ export default function SongPage({
       if (realtimeChannelRef.current) {
         supabase.removeChannel(
           realtimeChannelRef.current
+        );
+      }
+    };
+  }, [params.id]);
+
+  useEffect(() => {
+    if (likesRealtimeRef.current) {
+      supabase.removeChannel(likesRealtimeRef.current);
+    }
+
+    const channel = supabase
+      .channel(`song-likes-${params.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "likes",
+          filter: `song_id=eq.${params.id}`,
+        },
+        () => {
+          fetchLikes();
+        }
+      )
+      .subscribe();
+
+    likesRealtimeRef.current = channel;
+
+    return () => {
+      if (likesRealtimeRef.current) {
+        supabase.removeChannel(
+          likesRealtimeRef.current
         );
       }
     };
@@ -260,6 +361,11 @@ export default function SongPage({
                     </p>
 
                     <LiveListeners songId={song.id} />
+
+                    <div className="rounded-full border border-pink-500/40 bg-pink-950/30 px-4 py-2 text-xs font-black text-pink-300">
+                      ❤️ {likeCount} like
+                      {likeCount === 1 ? "" : "s"}
+                    </div>
                   </div>
 
                   <h1 className="mt-3 text-5xl font-black">
@@ -283,6 +389,18 @@ export default function SongPage({
                     {isCurrentSong
                       ? "Playing"
                       : "Play Song"}
+                  </button>
+
+                  <button
+                    onClick={toggleLike}
+                    disabled={likeLoading}
+                    className={`rounded-full px-6 py-3 text-sm font-black transition active:scale-95 ${
+                      liked
+                        ? "bg-pink-500 text-white hover:bg-pink-400"
+                        : "bg-zinc-800 text-white hover:bg-zinc-700"
+                    }`}
+                  >
+                    {liked ? "❤️ Liked" : "🤍 Like"}
                   </button>
 
                   {song.user_id && (
