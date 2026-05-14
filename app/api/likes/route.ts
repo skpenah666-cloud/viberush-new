@@ -26,15 +26,67 @@ async function getUserFromRequest(req: Request) {
   return data.user;
 }
 
+async function getSongLikeCount(songId: string) {
+  const supabase = getSupabase();
+
+  const { count } = await supabase
+    .from("likes")
+    .select("*", { count: "exact", head: true })
+    .eq("song_id", songId);
+
+  return count || 0;
+}
+
 export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const songId = searchParams.get("songId");
+
     const user = await getUserFromRequest(req);
+    const supabase = getSupabase();
+
+    if (songId) {
+      const { count, error: countError } = await supabase
+        .from("likes")
+        .select("*", { count: "exact", head: true })
+        .eq("song_id", songId);
+
+      if (countError) {
+        return NextResponse.json(
+          { error: "Failed to count likes", details: countError.message },
+          { status: 500 }
+        );
+      }
+
+      let liked = false;
+
+      if (user) {
+        const { data, error } = await supabase
+          .from("likes")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("song_id", songId)
+          .maybeSingle();
+
+        if (error) {
+          return NextResponse.json(
+            { error: "Failed to check like status", details: error.message },
+            { status: 500 }
+          );
+        }
+
+        liked = !!data;
+      }
+
+      return NextResponse.json({
+        liked,
+        likeCount: count || 0,
+      });
+    }
 
     if (!user) {
       return NextResponse.json({ likedSongIds: [] });
     }
-
-    const supabase = getSupabase();
 
     const { data, error } = await supabase
       .from("likes")
@@ -81,19 +133,25 @@ export async function POST(req: Request) {
 
     const supabase = getSupabase();
 
-    const { data: existingLike } = await supabase
+    const { data: existingLike, error: existingError } = await supabase
       .from("likes")
-      .select("*")
+      .select("id")
       .eq("user_id", user.id)
       .eq("song_id", songId)
       .maybeSingle();
+
+    if (existingError) {
+      return NextResponse.json(
+        { error: "Failed to check existing like", details: existingError.message },
+        { status: 500 }
+      );
+    }
 
     if (existingLike) {
       const { error } = await supabase
         .from("likes")
         .delete()
-        .eq("user_id", user.id)
-        .eq("song_id", songId);
+        .eq("id", existingLike.id);
 
       if (error) {
         return NextResponse.json(
@@ -102,7 +160,12 @@ export async function POST(req: Request) {
         );
       }
 
-      return NextResponse.json({ liked: false });
+      const likeCount = await getSongLikeCount(songId);
+
+      return NextResponse.json({
+        liked: false,
+        likeCount,
+      });
     }
 
     const { error } = await supabase.from("likes").insert({
@@ -132,7 +195,12 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json({ liked: true });
+    const likeCount = await getSongLikeCount(songId);
+
+    return NextResponse.json({
+      liked: true,
+      likeCount,
+    });
   } catch (error: any) {
     return NextResponse.json(
       { error: "Like failed", details: error?.message || String(error) },
