@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import WaveformBars from "@/components/WaveformBars";
 import { usePlayer } from "@/components/player/PlayerContext";
@@ -22,20 +22,33 @@ type Song = {
 
 type Comment = {
   id: string;
+  song_id?: string;
   user_email?: string | null;
   body: string;
   created_at?: string;
 };
 
-export default function SongPage({ params }: { params: { id: string } }) {
+export default function SongPage({
+  params,
+}: {
+  params: { id: string };
+}) {
   const [song, setSong] = useState<Song | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentBody, setCommentBody] = useState("");
   const [message, setMessage] = useState("");
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
 
-  const { currentSong, playSong: startPlayer } = usePlayer();
+  const realtimeChannelRef =
+    useRef<ReturnType<typeof supabase.channel> | null>(
+      null
+    );
+
+  const { currentSong, playSong: startPlayer } =
+    usePlayer();
 
   const fetchSong = async () => {
     const { data } = await supabase
@@ -50,12 +63,17 @@ export default function SongPage({ params }: { params: { id: string } }) {
 
   const fetchUser = async () => {
     const { data } = await supabase.auth.getUser();
+
     setUserEmail(data.user?.email || null);
   };
 
   const fetchComments = async () => {
-    const res = await fetch(`/api/comments?songId=${params.id}`);
+    const res = await fetch(
+      `/api/comments?songId=${params.id}`
+    );
+
     const data = await res.json();
+
     setComments(data.comments || []);
   };
 
@@ -63,6 +81,7 @@ export default function SongPage({ params }: { params: { id: string } }) {
     if (!commentBody.trim()) return;
 
     const { data } = await supabase.auth.getSession();
+
     const token = data.session?.access_token;
 
     if (!token) {
@@ -72,10 +91,12 @@ export default function SongPage({ params }: { params: { id: string } }) {
 
     const res = await fetch("/api/comments", {
       method: "POST",
+
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
+
       body: JSON.stringify({
         songId: params.id,
         body: commentBody,
@@ -91,7 +112,6 @@ export default function SongPage({ params }: { params: { id: string } }) {
 
     setCommentBody("");
     setMessage("Comment posted ✅");
-    await fetchComments();
   };
 
   const playSong = () => {
@@ -113,12 +133,57 @@ export default function SongPage({ params }: { params: { id: string } }) {
     fetchComments();
   }, [params.id]);
 
+  useEffect(() => {
+    if (realtimeChannelRef.current) {
+      supabase.removeChannel(realtimeChannelRef.current);
+    }
+
+    const channel = supabase
+      .channel(`song-comments-${params.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "comments",
+          filter: `song_id=eq.${params.id}`,
+        },
+        (payload) => {
+          const newComment = payload.new as Comment;
+
+          setComments((prev) => {
+            const exists = prev.some(
+              (comment) => comment.id === newComment.id
+            );
+
+            if (exists) return prev;
+
+            return [newComment, ...prev];
+          });
+        }
+      )
+      .subscribe();
+
+    realtimeChannelRef.current = channel;
+
+    return () => {
+      if (realtimeChannelRef.current) {
+        supabase.removeChannel(
+          realtimeChannelRef.current
+        );
+      }
+    };
+  }, [params.id]);
+
   const isCurrentSong = currentSong?.id === song?.id;
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-black via-zinc-950 to-orange-950 pb-40 text-white">
       <nav className="sticky top-0 z-20 flex items-center justify-between border-b border-zinc-900 bg-black/70 p-4 backdrop-blur-xl md:p-6">
-        <a href="/" className="text-2xl font-black text-orange-500">
+        <a
+          href="/"
+          className="text-2xl font-black text-orange-500"
+        >
           VibeRush
         </a>
 
@@ -146,7 +211,9 @@ export default function SongPage({ params }: { params: { id: string } }) {
           </div>
         ) : !song ? (
           <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-10 text-center">
-            <h1 className="text-3xl font-black">Song not found</h1>
+            <h1 className="text-3xl font-black">
+              Song not found
+            </h1>
 
             <a
               href="/library"
@@ -208,7 +275,9 @@ export default function SongPage({ params }: { params: { id: string } }) {
                     onClick={playSong}
                     className="rounded-full bg-orange-500 px-6 py-3 text-sm font-black text-black transition hover:bg-orange-400"
                   >
-                    {isCurrentSong ? "Playing" : "Play Song"}
+                    {isCurrentSong
+                      ? "Playing"
+                      : "Play Song"}
                   </button>
 
                   {song.user_id && (
@@ -231,23 +300,37 @@ export default function SongPage({ params }: { params: { id: string } }) {
             </div>
 
             <div className="mt-8 rounded-3xl border border-zinc-800 bg-zinc-950/80 p-5 shadow-2xl md:p-6">
-              <p className="text-sm font-bold uppercase tracking-widest text-orange-400">
-                Comments
-              </p>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-bold uppercase tracking-widest text-orange-400">
+                    Live Comments
+                  </p>
+
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Realtime discussion enabled
+                  </p>
+                </div>
+
+                <div className="rounded-full bg-green-500 px-4 py-2 text-xs font-black text-black">
+                  LIVE
+                </div>
+              </div>
 
               {userEmail ? (
-                <p className="mt-2 text-sm text-zinc-500">
+                <p className="mt-4 text-sm text-zinc-500">
                   Commenting as {userEmail}
                 </p>
               ) : (
-                <p className="mt-2 text-sm text-orange-300">
+                <p className="mt-4 text-sm text-orange-300">
                   Log in to leave a comment.
                 </p>
               )}
 
               <textarea
                 value={commentBody}
-                onChange={(e) => setCommentBody(e.target.value)}
+                onChange={(e) =>
+                  setCommentBody(e.target.value)
+                }
                 placeholder="Write a comment..."
                 className="mt-5 min-h-28 w-full rounded-2xl border border-zinc-800 bg-black p-4 text-white outline-none focus:border-orange-500"
               />
@@ -267,22 +350,35 @@ export default function SongPage({ params }: { params: { id: string } }) {
 
               <div className="mt-8 grid gap-4">
                 {comments.length === 0 ? (
-                  <p className="text-zinc-500">No comments yet.</p>
+                  <p className="text-zinc-500">
+                    No comments yet.
+                  </p>
                 ) : (
                   comments.map((comment) => (
                     <div
                       key={comment.id}
                       className="rounded-2xl border border-zinc-800 bg-black/60 p-4"
                     >
-                      <p className="text-xs font-bold text-orange-400">
-                        {comment.user_email || "VibeRush user"}
-                      </p>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="truncate text-xs font-bold text-orange-400">
+                          {comment.user_email ||
+                            "VibeRush user"}
+                        </p>
 
-                      <p className="mt-2 text-zinc-200">{comment.body}</p>
+                        <span className="rounded-full bg-green-500 px-2 py-1 text-[10px] font-black text-black">
+                          LIVE
+                        </span>
+                      </div>
+
+                      <p className="mt-2 text-zinc-200">
+                        {comment.body}
+                      </p>
 
                       {comment.created_at && (
                         <p className="mt-3 text-xs text-zinc-600">
-                          {new Date(comment.created_at).toLocaleString()}
+                          {new Date(
+                            comment.created_at
+                          ).toLocaleString()}
                         </p>
                       )}
                     </div>
