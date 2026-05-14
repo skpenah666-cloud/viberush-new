@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import WaveformBars from "@/components/WaveformBars";
+import { usePlayer } from "@/components/player/PlayerContext";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,6 +34,8 @@ export default function SongPage({ params }: { params: { id: string } }) {
   const [message, setMessage] = useState("");
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const { currentSong, playSong: startPlayer } = usePlayer();
 
   const fetchSong = async () => {
     const { data } = await supabase
@@ -91,14 +94,29 @@ export default function SongPage({ params }: { params: { id: string } }) {
     await fetchComments();
   };
 
+  const playSong = () => {
+    if (!song) return;
+
+    startPlayer({
+      id: song.id,
+      title: song.title,
+      artist: song.artist,
+      url: song.url,
+      coverUrl: song.cover_url,
+      userId: song.user_id,
+    });
+  };
+
   useEffect(() => {
     fetchSong();
     fetchUser();
     fetchComments();
   }, [params.id]);
 
+  const isCurrentSong = currentSong?.id === song?.id;
+
   return (
-    <main className="min-h-screen bg-gradient-to-br from-black via-zinc-950 to-orange-950 pb-24 text-white">
+    <main className="min-h-screen bg-gradient-to-br from-black via-zinc-950 to-orange-950 pb-40 text-white">
       <nav className="sticky top-0 z-20 flex items-center justify-between border-b border-zinc-900 bg-black/70 p-4 backdrop-blur-xl md:p-6">
         <a href="/" className="text-2xl font-black text-orange-500">
           VibeRush
@@ -129,6 +147,7 @@ export default function SongPage({ params }: { params: { id: string } }) {
         ) : !song ? (
           <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-10 text-center">
             <h1 className="text-3xl font-black">Song not found</h1>
+
             <a
               href="/library"
               className="mt-6 inline-block rounded-full bg-orange-500 px-6 py-3 font-black text-black"
@@ -138,7 +157,13 @@ export default function SongPage({ params }: { params: { id: string } }) {
           </div>
         ) : (
           <>
-            <div className="overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950/80 shadow-2xl">
+            <div
+              className={`overflow-hidden rounded-3xl border shadow-2xl ${
+                isCurrentSong
+                  ? "border-orange-500 bg-orange-950/30"
+                  : "border-zinc-800 bg-zinc-950/80"
+              }`}
+            >
               <div className="relative h-80 bg-zinc-900 md:h-96">
                 {song.cover_url ? (
                   <img
@@ -153,6 +178,12 @@ export default function SongPage({ params }: { params: { id: string } }) {
                 )}
 
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+
+                {isCurrentSong && (
+                  <div className="absolute right-6 top-6 rounded-full bg-green-500 px-4 py-2 text-sm font-black text-black">
+                    Playing
+                  </div>
+                )}
 
                 <div className="absolute bottom-6 left-6 right-6">
                   <p className="text-sm font-bold uppercase tracking-widest text-orange-400">
@@ -172,11 +203,14 @@ export default function SongPage({ params }: { params: { id: string } }) {
               <div className="space-y-5 p-5 md:p-6">
                 <WaveformBars />
 
-                <audio controls className="w-full rounded-xl">
-                  <source src={song.url} />
-                </audio>
-
                 <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={playSong}
+                    className="rounded-full bg-orange-500 px-6 py-3 text-sm font-black text-black transition hover:bg-orange-400"
+                  >
+                    {isCurrentSong ? "Playing" : "Play Song"}
+                  </button>
+
                   {song.user_id && (
                     <a
                       href={`/artist/${song.user_id}`}
@@ -188,7 +222,7 @@ export default function SongPage({ params }: { params: { id: string } }) {
 
                   <a
                     href="/library"
-                    className="rounded-full bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:bg-orange-400"
+                    className="rounded-full bg-zinc-800 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-700"
                   >
                     Back to Library
                   </a>
