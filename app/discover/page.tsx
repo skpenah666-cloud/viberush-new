@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import WaveformBars from "@/components/WaveformBars";
+import { usePlayer } from "@/components/player/PlayerContext";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,12 +21,23 @@ type Song = {
   created_at?: string;
 };
 
-const vibes = ["All", "Afrobeats", "Dancehall", "Hip-Hop", "Gospel", "R&B", "Amapiano", "Other"];
+const vibes = [
+  "All",
+  "Afrobeats",
+  "Dancehall",
+  "Hip-Hop",
+  "Gospel",
+  "R&B",
+  "Amapiano",
+  "Other",
+];
 
 export default function DiscoverPage() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [selectedVibe, setSelectedVibe] = useState("All");
   const [loading, setLoading] = useState(true);
+
+  const { currentSong, playSong: startPlayer } = usePlayer();
 
   useEffect(() => {
     const fetchSongs = async () => {
@@ -50,8 +62,29 @@ export default function DiscoverPage() {
     });
   }, [songs, selectedVibe]);
 
+  const playSong = (song: Song) => {
+    startPlayer(
+      {
+        id: song.id,
+        title: song.title,
+        artist: song.artist,
+        url: song.url,
+        coverUrl: song.cover_url,
+        userId: song.user_id,
+      },
+      filteredSongs.map((item) => ({
+        id: item.id,
+        title: item.title,
+        artist: item.artist,
+        url: item.url,
+        coverUrl: item.cover_url,
+        userId: item.user_id,
+      }))
+    );
+  };
+
   return (
-    <main className="min-h-screen bg-gradient-to-br from-black via-zinc-950 to-orange-950 pb-24 text-white">
+    <main className="min-h-screen bg-gradient-to-br from-black via-zinc-950 to-orange-950 pb-40 text-white">
       <nav className="sticky top-0 z-20 flex items-center justify-between border-b border-zinc-900 bg-black/70 p-4 backdrop-blur-xl md:p-6">
         <a href="/" className="text-2xl font-black text-orange-500">
           VibeRush
@@ -117,78 +150,96 @@ export default function DiscoverPage() {
         ) : filteredSongs.length === 0 ? (
           <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-10 text-center">
             <h2 className="text-2xl font-black">No songs found</h2>
+
             <p className="mt-2 text-zinc-400">
               Try another vibe or upload music with a genre tag.
             </p>
           </div>
         ) : (
           <div className="grid gap-5 md:grid-cols-2">
-            {filteredSongs.map((song, index) => (
-              <div
-                key={song.id}
-                className="overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950/80 shadow-2xl transition hover:-translate-y-1 hover:shadow-orange-900/20"
-              >
-                <div className="relative h-56 bg-zinc-900">
-                  {song.cover_url ? (
-                    <img
-                      src={song.cover_url}
-                      alt={`${song.title} cover`}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-orange-950 via-black to-zinc-900 text-5xl">
-                      🎧
+            {filteredSongs.map((song, index) => {
+              const isCurrentSong = currentSong?.id === song.id;
+
+              return (
+                <div
+                  key={song.id}
+                  className={`overflow-hidden rounded-3xl border shadow-2xl transition hover:-translate-y-1 ${
+                    isCurrentSong
+                      ? "border-orange-500 bg-orange-950/30 shadow-orange-900/30"
+                      : "border-zinc-800 bg-zinc-950/80 hover:shadow-orange-900/20"
+                  }`}
+                >
+                  <div className="relative h-56 bg-zinc-900">
+                    {song.cover_url ? (
+                      <img
+                        src={song.cover_url}
+                        alt={`${song.title} cover`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-orange-950 via-black to-zinc-900 text-5xl">
+                        🎧
+                      </div>
+                    )}
+
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+
+                    <div className="absolute left-4 top-4 rounded-full bg-orange-500 px-3 py-1 text-xs font-black text-black">
+                      {song.genre || "Other"}
                     </div>
-                  )}
 
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+                    {isCurrentSong && (
+                      <div className="absolute right-4 top-4 rounded-full bg-green-500 px-3 py-1 text-xs font-black text-black">
+                        Playing
+                      </div>
+                    )}
 
-                  <div className="absolute left-4 top-4 rounded-full bg-orange-500 px-3 py-1 text-xs font-black text-black">
-                    {song.genre || "Other"}
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+                        Discovery #{index + 1}
+                      </p>
+
+                      <h2 className="truncate text-2xl font-black text-white">
+                        {song.title}
+                      </h2>
+
+                      <p className="truncate text-sm text-orange-300">
+                        {song.artist}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="absolute bottom-4 left-4 right-4">
-                    <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">
-                      Discovery #{index + 1}
-                    </p>
+                  <div className="space-y-4 p-5">
+                    <WaveformBars />
 
-                    <h2 className="truncate text-2xl font-black text-white">
-                      {song.title}
-                    </h2>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => playSong(song)}
+                        className="rounded-full bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:bg-orange-400"
+                      >
+                        {isCurrentSong ? "Playing" : "Play"}
+                      </button>
 
-                    <p className="truncate text-sm text-orange-300">
-                      {song.artist}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-4 p-5">
-                  <WaveformBars />
-
-                  <audio controls className="w-full rounded-xl">
-                    <source src={song.url} />
-                  </audio>
-
-                  <div className="flex flex-wrap gap-2">
-                    <a
-                      href={`/song/${song.id}`}
-                      className="rounded-full bg-orange-500 px-5 py-3 text-sm font-black text-black transition hover:bg-orange-400"
-                    >
-                      Open Song
-                    </a>
-
-                    {song.user_id && (
                       <a
-                        href={`/artist/${song.user_id}`}
+                        href={`/song/${song.id}`}
                         className="rounded-full bg-zinc-800 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-700"
                       >
-                        Artist
+                        Open Song
                       </a>
-                    )}
+
+                      {song.user_id && (
+                        <a
+                          href={`/artist/${song.user_id}`}
+                          className="rounded-full bg-zinc-800 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-700"
+                        >
+                          Artist
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
