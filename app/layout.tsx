@@ -7,6 +7,7 @@ import GlobalPlayer from "@/components/player/GlobalPlayer";
 import MobileNav from "@/components/navigation/MobileNav";
 import RegisterServiceWorker from "@/components/RegisterServiceWorker";
 import RealtimeNotifications from "@/components/RealtimeNotifications";
+import RealtimeToast from "@/components/RealtimeToast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -71,6 +72,7 @@ export default function RootLayout({
         <PlayerProvider>
           <RegisterServiceWorker />
           <RealtimeNotifications />
+          <RealtimeToast />
 
           <div className="relative flex min-h-screen flex-col">
             <main className="flex-1 pb-36 md:pb-32">
