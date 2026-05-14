@@ -21,6 +21,11 @@ const navItems = [
     icon: "🎶",
   },
   {
+    href: "/recommended",
+    label: "For You",
+    icon: "✨",
+  },
+  {
     href: "/notifications",
     label: "Alerts",
     icon: "🔔",
@@ -82,13 +87,13 @@ export default function MobileNav() {
     <>
       <a
         href="/upload"
-        className="fixed bottom-24 right-5 z-50 flex h-16 w-16 items-center justify-center rounded-full bg-orange-500 text-3xl font-black text-black shadow-2xl shadow-orange-900/40 transition hover:scale-105 hover:bg-orange-400 active:scale-95 md:bottom-6"
+        className="fixed bottom-28 right-5 z-50 flex h-16 w-16 items-center justify-center rounded-full bg-orange-500 text-3xl font-black text-black shadow-2xl shadow-orange-900/40 transition hover:scale-105 hover:bg-orange-400 active:scale-95 md:bottom-6"
       >
         +
       </a>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-800 bg-black/95 px-2 pb-safe backdrop-blur-xl">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-1 py-2">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-1 overflow-x-auto py-2">
           {navItems.map((item) => {
             const active =
               pathname === item.href ||
@@ -98,21 +103,21 @@ export default function MobileNav() {
               <a
                 key={item.href}
                 href={item.href}
-                className={`relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-2xl px-2 py-3 text-center transition active:scale-95 ${
+                className={`relative flex min-w-[72px] flex-1 flex-col items-center justify-center rounded-2xl px-2 py-3 text-center transition active:scale-95 ${
                   active
                     ? "bg-orange-500 text-black"
                     : "text-zinc-500 hover:bg-zinc-900 hover:text-white"
                 }`}
               >
                 {item.hasBadge && unreadCount > 0 && (
-                  <span className="absolute right-3 top-2 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white ring-2 ring-black">
+                  <span className="absolute right-2 top-2 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white ring-2 ring-black">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
 
                 <span className="text-xl">{item.icon}</span>
 
-                <span className="mt-1 truncate text-[11px] font-black uppercase tracking-wide">
+                <span className="mt-1 truncate text-[10px] font-black uppercase tracking-wide">
                   {item.label}
                 </span>
               </a>
