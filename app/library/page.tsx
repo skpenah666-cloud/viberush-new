@@ -166,7 +166,9 @@ export default function LibraryPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) return alert(data?.details || data?.error || "Could not add to playlist.");
+      if (!res.ok) {
+        return alert(data?.details || data?.error || "Could not add to playlist.");
+      }
 
       alert("Added to playlist ✅");
     } finally {
@@ -455,9 +457,38 @@ export default function LibraryPage() {
               </select>
 
               {playlists.length > 0 && (
-                <p className="mt-3 text-xs text-zinc-500">
-                  Your playlists: {playlists.map((p) => p.name).join(", ")}
-                </p>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {playlists.map((playlist) => (
+                    <a
+                      key={playlist.id}
+                      href={`/playlist/${playlist.id}`}
+                      className="group rounded-2xl border border-zinc-800 bg-black/60 p-4 transition hover:-translate-y-1 hover:border-orange-500 hover:bg-orange-950/20"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold uppercase tracking-widest text-orange-400">
+                            Playlist
+                          </p>
+
+                          <h3 className="truncate text-lg font-black text-white">
+                            {playlist.name}
+                          </h3>
+
+                          {playlist.created_at && (
+                            <p className="mt-1 text-xs text-zinc-500">
+                              Created{" "}
+                              {new Date(playlist.created_at).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="rounded-full bg-orange-500 px-4 py-2 text-xs font-black text-black transition group-hover:bg-orange-400">
+                          Open →
+                        </div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
               )}
             </div>
           )}
