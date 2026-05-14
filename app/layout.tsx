@@ -4,6 +4,7 @@ import "./globals.css";
 
 import { PlayerProvider } from "@/components/player/PlayerContext";
 import GlobalPlayer from "@/components/player/GlobalPlayer";
+import MobileNav from "@/components/navigation/MobileNav";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,10 +31,19 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-black text-white">
+      <body className="min-h-full bg-black text-white">
         <PlayerProvider>
-          {children}
-          <GlobalPlayer />
+          <div className="relative flex min-h-screen flex-col">
+            <main className="flex-1 pb-36 md:pb-32">
+              {children}
+            </main>
+
+            <GlobalPlayer />
+
+            <div className="md:hidden">
+              <MobileNav />
+            </div>
+          </div>
         </PlayerProvider>
       </body>
     </html>
