@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import WaveformBars from "@/components/WaveformBars";
+import LiveListeners from "@/components/LiveListeners";
 import { usePlayer } from "@/components/player/PlayerContext";
 
 const supabase = createClient(
@@ -253,11 +254,15 @@ export default function SongPage({
                 )}
 
                 <div className="absolute bottom-6 left-6 right-6">
-                  <p className="text-sm font-bold uppercase tracking-widest text-orange-400">
-                    Public Track
-                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <p className="text-sm font-bold uppercase tracking-widest text-orange-400">
+                      Public Track
+                    </p>
 
-                  <h1 className="mt-2 text-5xl font-black">
+                    <LiveListeners songId={song.id} />
+                  </div>
+
+                  <h1 className="mt-3 text-5xl font-black">
                     {song.title}
                   </h1>
 
