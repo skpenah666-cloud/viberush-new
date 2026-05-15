@@ -21,6 +21,11 @@ const navItems = [
     icon: "🎶",
   },
   {
+    href: "/search",
+    label: "Search",
+    icon: "🔍",
+  },
+  {
     href: "/recommended",
     label: "For You",
     icon: "✨",
@@ -35,6 +40,11 @@ const navItems = [
     href: "/library",
     label: "Library",
     icon: "🎧",
+  },
+  {
+    href: "/about",
+    label: "About",
+    icon: "⚡",
   },
   {
     href: "/profile",
@@ -93,17 +103,18 @@ export default function MobileNav() {
       </a>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-800 bg-black/95 px-2 pb-safe backdrop-blur-xl">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-1 overflow-x-auto py-2">
+        <div className="mx-auto flex max-w-7xl items-center gap-1 overflow-x-auto py-2">
           {navItems.map((item) => {
             const active =
               pathname === item.href ||
-              (item.href !== "/" && pathname.startsWith(item.href));
+              (item.href !== "/" &&
+                pathname.startsWith(item.href));
 
             return (
               <a
                 key={item.href}
                 href={item.href}
-                className={`relative flex min-w-[72px] flex-1 flex-col items-center justify-center rounded-2xl px-2 py-3 text-center transition active:scale-95 ${
+                className={`relative flex min-w-[76px] flex-1 flex-col items-center justify-center rounded-2xl px-2 py-3 text-center transition active:scale-95 ${
                   active
                     ? "bg-orange-500 text-black"
                     : "text-zinc-500 hover:bg-zinc-900 hover:text-white"
